@@ -3,41 +3,45 @@
 <title>AudioPlay</title>
 </head>
 <body>
-<button class="play-btn" data-freq="220.000">A3</button>
-<button class="play-btn" data-freq="233.082">A3#</button>
-<button class="play-btn" data-freq="246.942">B3</button>
-<button class="play-btn" data-freq="261.626">C4</button>
-<button class="play-btn" data-freq="277.183">C4#</button>
-<button class="play-btn" data-freq="293.665">D4</button>
-<button class="play-btn" data-freq="311.127">D4#</button>
-<button class="play-btn" data-freq="329.628">E4</button>
-<button class="play-btn" data-freq="349.228">F4</button>
-<button class="play-btn" data-freq="369.994">F4#</button>
-<button class="play-btn" data-freq="391.995">G4</button>
-<button class="play-btn" data-freq="415.305">G4#</button>
-<br>
-<button class="play-btn" data-freq="440.000">A4</button>
-<button class="play-btn" data-freq="466.164">A4#</button>
-<button class="play-btn" data-freq="493.883">B4</button>
-<button class="play-btn" data-freq="523.251">C5</button>
-<button class="play-btn" data-freq="554.365">C5#</button>
-<button class="play-btn" data-freq="587.330">D5</button>
-<button class="play-btn" data-freq="622.254">D5#</button>
-<button class="play-btn" data-freq="659.255">E5</button>
-<button class="play-btn" data-freq="698.456">F5</button>
-<button class="play-btn" data-freq="739.989">F5#</button>
-<button class="play-btn" data-freq="783.991">G5</button>
-<button class="play-btn" data-freq="830.609">G5#</button>
-<br>
-<button class="play-btn" data-freq="880.000">A5</button>
+<div id="keys"></div>
 <br>
 <input type="range" min="0" max="1" step="0.05" value="0.25" id="volume-input" />
 <script>
-let audioCtx, gainNode;
-for(const btn of document.getElementsByClassName('play-btn')) {
+
+const concertPitch = 440; // Note 49, A4, 440 Hz
+const concertPitchNum = 48; // (0 index)
+const sharps = [false, true, false, false, true, false, true, false, false, true, false, true];
+const noteRatio = Math.exp(Math.LN2 / 12);
+
+const keysDiv = document.getElementById('keys');
+for (let i = 0; i < 96; i++) {
+    const btn = document.createElement('button');
+    const num = i;
+    btn.innerText = getNoteName(num);
     btn.addEventListener('click', function (e){
-        playNote(e.target.dataset.freq);
+        playNote(getNoteFreq(num));
+        console.log(getNoteName(num));
     });
+    keysDiv.appendChild(btn);
+
+    if(num % 12 == 11) {
+        keysDiv.appendChild(document.createElement('br'));
+    }
+}
+
+function getNoteFreq (num) {
+    return concertPitch * Math.pow(noteRatio, num - concertPitchNum);
+}
+
+function getNoteName (num) {
+    const mod = num % 12;
+    const alpha = 'AABCCDDEFFGG'[mod];
+    const sharp = sharps[mod] ? '♯' : '';
+    const octave = Math.floor(num/12) + ((alpha === "A" || alpha === "B") ? 0 : 1);
+    return alpha + sharp + octave;
+}
+
+for(const btn of document.getElementsByClassName('play-btn')) {
 }
 
 document.getElementById('volume-input').addEventListener('change', function (e) {
@@ -46,6 +50,20 @@ document.getElementById('volume-input').addEventListener('change', function (e) 
 	}
 });
 
+document.addEventListener('keydown', function (e) {
+    const keyMap = '1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./ `';
+    const noteNum = keyMap.indexOf(e.key);
+    if (noteNum >= 0) {
+        playNoteNum(noteNum + 24);
+        console.log(getNoteName(noteNum + 24));
+    }
+});
+
+function playNoteNum(num) {
+    return playNote(getNoteFreq(num));
+}
+
+let audioCtx, gainNode;
 function playNote (freq) {
 	if (!audioCtx) {
 		audioCtx = new (window.AudioContext || window.webkitAudioContext)();
