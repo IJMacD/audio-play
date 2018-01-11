@@ -3,69 +3,107 @@
 <title>AudioPlay</title>
 </head>
 <body>
-<button class="play-btn" data-freq="400">A</button>
-<button class="play-btn" data-freq="410.16">A+</button>
-<button class="play-btn" data-freq="420.58">B</button>
-<button class="play-btn" data-freq="431.26">B+</button>
-<button class="play-btn" data-freq="442.22">C</button>
-<button class="play-btn" data-freq="453.45">D</button>
-<button class="play-btn" data-freq="464.97">D+</button>
-<button class="play-btn" data-freq="476.78">E</button>
-<button class="play-btn" data-freq="488.90">E+</button>
-<button class="play-btn" data-freq="501.32">F</button>
-<button class="play-btn" data-freq="514.05">F+</button>
-<button class="play-btn" data-freq="527.11">G</button>
-<button class="play-btn" data-freq="800">A2</button>
+<button class="play-btn" data-freq="220.000">A3</button>
+<button class="play-btn" data-freq="233.082">A3#</button>
+<button class="play-btn" data-freq="246.942">B3</button>
+<button class="play-btn" data-freq="261.626">C4</button>
+<button class="play-btn" data-freq="277.183">C4#</button>
+<button class="play-btn" data-freq="293.665">D4</button>
+<button class="play-btn" data-freq="311.127">D4#</button>
+<button class="play-btn" data-freq="329.628">E4</button>
+<button class="play-btn" data-freq="349.228">F4</button>
+<button class="play-btn" data-freq="369.994">F4#</button>
+<button class="play-btn" data-freq="391.995">G4</button>
+<button class="play-btn" data-freq="415.305">G4#</button>
+<br>
+<button class="play-btn" data-freq="440.000">A4</button>
+<button class="play-btn" data-freq="466.164">A4#</button>
+<button class="play-btn" data-freq="493.883">B4</button>
+<button class="play-btn" data-freq="523.251">C5</button>
+<button class="play-btn" data-freq="554.365">C5#</button>
+<button class="play-btn" data-freq="587.330">D5</button>
+<button class="play-btn" data-freq="622.254">D5#</button>
+<button class="play-btn" data-freq="659.255">E5</button>
+<button class="play-btn" data-freq="698.456">F5</button>
+<button class="play-btn" data-freq="739.989">F5#</button>
+<button class="play-btn" data-freq="783.991">G5</button>
+<button class="play-btn" data-freq="830.609">G5#</button>
+<br>
+<button class="play-btn" data-freq="880.000">A5</button>
+<br>
+<input type="range" min="0" max="1" step="0.05" value="0.25" id="volume-input" />
 <script>
-let audioCtx;
+let audioCtx, gainNode;
 for(const btn of document.getElementsByClassName('play-btn')) {
-    btn.addEventListener('click', function (e){ 
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        
-        const duration = 1;
-
-        // Create an empty three-second stereo buffer at the sample rate of the AudioContext
-        var myArrayBuffer = audioCtx.createBuffer(2, audioCtx.sampleRate * duration, audioCtx.sampleRate);
-
-        // Fill the buffer with white noise;
-        // just random values between -1.0 and 1.0
-        for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
-          // This gives us the actual array that contains the data
-          var nowBuffering = myArrayBuffer.getChannelData(channel);
-          for (var i = 0; i < myArrayBuffer.length; i++) {
-            // Math.random() is in [0; 1.0]
-            // audio needs to be in [-1.0; 1.0]
-            const freq = e.target.dataset.freq;
-            nowBuffering[i] = average(tone(freq, i), tone(freq*2, i), tone(freq*4, i)) * Math.abs(Math.sin(i * ((1/duration) / audioCtx.sampleRate) * Math.PI));
-          }
-        }
-
-        // Get an AudioBufferSourceNode.
-        // This is the AudioNode to use when we want to play an AudioBuffer
-        var source = audioCtx.createBufferSource();
-
-        // set the buffer in the AudioBufferSourceNode
-        source.buffer = myArrayBuffer;
-
-        // connect the AudioBufferSourceNode to the
-        // destination so we can hear the sound
-        source.connect(audioCtx.destination);
-
-        // start the source playing
-        source.start();
-        
-        function tone (freq, i) {
-            return Math.sin(i * (freq / audioCtx.sampleRate) * Math.PI * 2);
-        }
-        
-        function average() {
-            return Array.prototype.reduce.call(arguments, (a,b) => a + b, 0) / arguments.length;
-        }
+    btn.addEventListener('click', function (e){
+        playNote(e.target.dataset.freq);
     });
 }
 
+document.getElementById('volume-input').addEventListener('change', function (e) {
+	if (gainNode) {
+		gainNode.gain.linearRampToValueAtTime(e.target.value, audioCtx.currentTime + 1);
+	}
+});
+
+function playNote (freq) {
+	if (!audioCtx) {
+		audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+		gainNode = audioCtx.createGain();
+
+		gainNode.gain.setValueAtTime(0.25, 0);
+
+		gainNode.connect(audioCtx.destination);
+	}
+
+	const duration = 1;
+	const chord = false;
+
+	// Create an empty three-second stereo buffer at the sample rate of the AudioContext
+	var myArrayBuffer = audioCtx.createBuffer(2, audioCtx.sampleRate * duration, audioCtx.sampleRate);
+
+	// Fill the buffer with white noise;
+	// just random values between -1.0 and 1.0
+	for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
+	  // This gives us the actual array that contains the data
+	  var nowBuffering = myArrayBuffer.getChannelData(channel);
+	  for (var i = 0; i < myArrayBuffer.length; i++) {
+		// Math.random() is in [0; 1.0]
+		// audio needs to be in [-1.0; 1.0]
+
+		let baseValue;
+		if (chord) {
+			baseValue = average(tone(freq, i), tone(freq*2, i), tone(freq*4, i));
+		} else {
+			baseValue = tone(freq, i);
+		}
+
+		nowBuffering[i] =  baseValue * Math.abs(Math.sin(i * ((1/duration) / audioCtx.sampleRate) * Math.PI));
+	  }
+	}
+
+	// Get an AudioBufferSourceNode.
+	// This is the AudioNode to use when we want to play an AudioBuffer
+	var source = audioCtx.createBufferSource();
+
+	// set the buffer in the AudioBufferSourceNode
+	source.buffer = myArrayBuffer;
+
+	// connect the AudioBufferSourceNode to the
+	// destination so we can hear the sound
+	source.connect(gainNode);
+
+	// start the source playing
+	source.start();
+
+	function tone (freq, i) {
+		return Math.sin(i * (freq / audioCtx.sampleRate) * Math.PI * 2);
+	}
+
+	function average() {
+		return Array.prototype.reduce.call(arguments, (a,b) => a + b, 0) / arguments.length;
+	}
+}
 </script>
 </body>
 </html>
