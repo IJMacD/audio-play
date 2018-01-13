@@ -358,58 +358,11 @@ function getAsciiText(dataView, index, length) {
 
 function createNote (audioCtx, freq, gain) {
 
-	const duration = 0.1;
-	const chord = false;
-	const smooth = false;
-
-	// Create an empty three-second stereo buffer at the sample rate of the AudioContext
-	var myArrayBuffer = audioCtx.createBuffer(2, audioCtx.sampleRate / freq, audioCtx.sampleRate);
-
-	for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
-	  // This gives us the actual array that contains the data
-	  var nowBuffering = myArrayBuffer.getChannelData(channel);
-	  for (var i = 0; i < myArrayBuffer.length; i++) {
-
-		let baseValue;
-		if (chord) {
-			baseValue = average(tone(freq, i), tone(freq*2, i), tone(freq*4, i));
-		} else {
-			baseValue = tone(freq, i);
-		}
-
-		let value;
-
-		if (smooth) {
-			const rampUpSamples = myArrayBuffer.length / 10;
-			if (i < rampUpSamples) {
-				// Ramp Up
-				value = baseValue *= (i / rampUpSamples);
-			} else if (i > (myArrayBuffer.length - rampUpSamples)) {
-				// Ramp Down
-				value = baseValue *= ((myArrayBuffer.length - i) / rampUpSamples);
-			}
-			else {
-				value = baseValue;
-			}
-		} else {
-			value = baseValue;
-		}
-
-		nowBuffering[i] = value;
-	  }
-	}
-
-	// Get an AudioBufferSourceNode.
-	// This is the AudioNode to use when we want to play an AudioBuffer
-	var source = audioCtx.createBufferSource();
-
-	// set the buffer in the AudioBufferSourceNode
-	source.buffer = myArrayBuffer;
-
-	source.loop = true;
-	source.loopLength = 1 / freq;
+	var source = audioCtx.createOscillator();
+	source.frequency.setValueAtTime(freq, 0);
 
 	var gainNode = audioCtx.createGain();
+	gainNode.gain.setValueAtTime(0, 0);
 
 	source.connect(gainNode);
 
@@ -417,20 +370,11 @@ function createNote (audioCtx, freq, gain) {
 		connect: gainNode.connect.bind(gainNode),
 		start: when => {
 			source.start(when);
-			gainNode.gain.setValueAtTime(0, when);
-			gainNode.gain.setValueAtTime(gain, when + 0.1);
+			gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
 		},
 		stop: when => {
 			source.stop(when + 0.1);
-			gainNode.gain.setValueAtTime(0, when + 0.1);
+			gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
 		},
 	};
-
-	function tone (freq, i) {
-		return Math.sin(i * (freq / audioCtx.sampleRate) * Math.PI * 2);
-	}
-
-	function average() {
-		return Array.prototype.reduce.call(arguments, (a,b) => a + b, 0) / arguments.length;
-	}
 }
