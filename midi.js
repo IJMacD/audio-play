@@ -5,10 +5,6 @@ class MidiNode {
 
 	openFile (buffer) {
 		this.buffer = buffer;
-
-		const arr = new Uint8Array(buffer);
-
-		console.log(arr.map(b => b.toString(16)).join(" "));
 	}
 
 	connect (destination) {
@@ -18,8 +14,8 @@ class MidiNode {
 	start (when = 0) {
 		when = Math.max(when, this.audioContext.currentTime);
 
-		const view = new DataView(this.buffer);
-		let index = 0;
+		const midi = parseMidi(this.buffer);
+		console.log(midi);
 
 		const tempo = 500000;	// Microseconds per quater note (500000 = 120 bpm)
 
@@ -31,164 +27,21 @@ class MidiNode {
 			return concertPitch * Math.pow(noteRatio, num - concertPitchMidiNum);
 		}
 
-		if (view.getUint8(0) !== intval('M') ||
-			view.getUint8(1) !== intval('T') ||
-			view.getUint8(2) !== intval('h') ||
-			view.getUint8(3) !== intval('d'))
-		{
-			throw new Error("Not a MIDI file");
-		}
-
-		const headerLength = view.getUint32(4);
-
-		const format = view.getUint16(8);
-		const trackCount = view.getUint16(10);
-		const division = view.getUint16(12);	// ticks per quater note
-
-		console.log({ format, trackCount, division });
-
-		index += 8 + headerLength;
-
-		let trackNo = 0;
-
-		while (index < this.buffer.byteLength) {
-			const type = [
-				charval(view.getUint8(index + 0)),
-				charval(view.getUint8(index + 1)),
-				charval(view.getUint8(index + 2)),
-				charval(view.getUint8(index + 3)),
-			].join("");
-
-			const length = view.getUint32(index + 4);
-
-			index += 8;
-
-			const endIndex = index + length;
-
-			if (type !== "MTrk")
-			{
-				console.log("Unrecognised chunk", type);
-				index += length;
-				continue;
-			}
-
-			console.log("Track ", trackNo);
+		midi.tracks.forEach(track => {
 
 			let nextTime = when;
-			let prevStatus;
 
-			while (index < endIndex) {
-				let deltaTime = view.getUint8(index++);
+			track.events.forEach(evt => {
+				nextTime += evt.deltaTime * ((tempo / midi.division) * 1e-6);
 
-				if (deltaTime > 127) {
-					const nextByte = view.getUint8(index++);
-					if (nextByte > 127) {
-						const thirdByte = view.getUint8(index++);
-						if (thirdByte > 127) {
-							throw new Error("Not Implemented: Variable Length Encoding");
-						}
-						deltaTime = ((deltaTime & 0x7f) * 128 + (nextByte & 0x7f)) * 128 + thirdByte;
-
-					}
-					else {
-						deltaTime = (deltaTime & 0x7f) * 128 + nextByte;
-					}
+				if (evt.type === 0x80) {
+					this.noteOff(nextTime, evt.channel, evt.key, evt.velocity);
 				}
-
-				nextTime += deltaTime * ((tempo / division) * 1e-6);
-
-				const status = view.getUint8(index++);
-				const channel = status & 0x0f;
-
-				let key;
-				let velocity;
-
-				switch (status & 0xf0) {
-					case 0x80:
-						key = view.getUint8(index++);
-						velocity = view.getUint8(index++);
-
-						this.noteOff(nextTime, channel, key, velocity);
-
-						break;
-					case 0x90:
-						key = view.getUint8(index++);
-						velocity = view.getUint8(index++);
-
-						this.noteOn(nextTime, channel, key, velocity);
-
-						break;
-					case 0xA0:
-					case 0xB0:
-					case 0xE0:
-						console.log("Unsupported Event", "0x" + (status & 0xf0).toString(16) + " at 0x" + (index-1).toString(16));
-						index++;
-						index++;
-						break;
-					case 0xC0:
-					case 0xD0:
-						console.log("Unsupported Event", "0x" + (status & 0xf0).toString(16) + " at 0x" + (index-1).toString(16));
-						index++;
-						break;
-					case 0xF0:
-						switch (status) {
-							case 0xF0:
-							case 0xF7:
-								throw new Error("Sysex Events not supported");
-							case 0xFF:
-								const type = view.getUint8(index++);
-								const length = view.getUint8(index++);
-								index += length;
-								break;
-							default:
-								throw new Error("Unsupported Event Type " +  "0x" + status.toString(16) + " at 0x" + index.toString(16));
-						}
-						break;
-					default:
-						if (status < 0x80) {
-							// Continuation - "Running Mode"
-							index--; // backtrack
-							const prevChannel = prevStatus & 0x0F;
-							switch (prevStatus & 0xF0) {
-								case 0x80:
-									key = view.getUint8(index++);
-									velocity = view.getUint8(index++);
-									this.noteOff(nextTime, prevChannel, key, velocity);
-									break;
-								case 0x90:
-									key = view.getUint8(index++);
-									velocity = view.getUint8(index++);
-									this.noteOff(nextTime, prevChannel, key, velocity);
-									break;
-								case 0xA0:
-								case 0xB0:
-								case 0xE0:
-									console.log("Unsupported Continuation Event", "0x" + (prevStatus & 0xf0).toString(16) + " at 0x" + (index-1).toString(16));
-									index++;
-									index++;
-									break;
-								case 0xC0:
-								case 0xD0:
-									console.log("Unsupported Continuation Event", "0x" + (prevStatus & 0xf0).toString(16) + " at 0x" + (index-1).toString(16));
-									index++;
-									break;
-								default:
-									throw new Error("Unsupported Continuation Event Type " +  "0x" + prevStatus.toString(16) + " at 0x" + index.toString(16));
-
-							}
-						}
-						else {
-							throw new Error("Unsupported Event Type " + "0x" + status.toString(16) + " at 0x" + (index-1).toString(16));
-						}
+				else if (evt.type === 0x90) {
+					this.noteOn(nextTime, evt.channel, evt.key, evt.velocity);
 				}
-
-				if (status & 0x80) {
-					prevStatus = status;
-				}
-			}
-
-			trackNo++;
-		}
+			});
+		})
 	}
 
 	noteOn (when, channel, key, velocity) {
@@ -213,8 +66,6 @@ class MidiNode {
 		o.start(when);
 
 		oscillators[key] = o;
-
-		console.log({ status: "NOTE_ON", key, velocity, time: when });
 	}
 
 	noteOff (when, channel, key, velocity) {
@@ -230,8 +81,6 @@ class MidiNode {
 			oscillators[key].stop(when);
 			oscillators[key] = null;
 		}
-
-		console.log({ status: "NOTE_OFF", key, velocity, time: when });
 	}
 }
 
@@ -241,4 +90,248 @@ function intval (c) {
 
 function charval (i) {
 	return String.fromCharCode(i);
+}
+
+function parseMidi (buffer) {
+	const view = new DataView(buffer);
+	let index = 0;
+
+	if (view.getUint8(0) !== intval('M') ||
+		view.getUint8(1) !== intval('T') ||
+		view.getUint8(2) !== intval('h') ||
+		view.getUint8(3) !== intval('d'))
+	{
+		throw new Error("Not a MIDI file");
+	}
+
+	const headerLength = view.getUint32(4);
+
+	const format = view.getUint16(8);
+	const trackCount = view.getUint16(10);
+	const division = view.getUint16(12);	// ticks per quater note
+
+	const midi = { format, trackCount, division };
+
+	index += 8 + headerLength;
+
+	let trackNo = 0;
+
+	midi.tracks = [];
+
+	while (index < buffer.byteLength) {
+		const type = [
+			charval(view.getUint8(index + 0)),
+			charval(view.getUint8(index + 1)),
+			charval(view.getUint8(index + 2)),
+			charval(view.getUint8(index + 3)),
+		].join("");
+
+		const length = view.getUint32(index + 4);
+
+		index += 8;
+
+		const endIndex = index + length;
+
+		if (type !== "MTrk")
+		{
+			console.log("Unrecognised chunk", type);
+			index += length;
+			continue;
+		}
+
+		const track = { events: [] };
+		let meta = track;
+
+		let prevStatus;
+
+		while (index < endIndex) {
+			const res = parseVariableLength(view, index);
+			const deltaTime = res.value;
+			index = res.index;
+
+			const status = view.getUint8(index++);
+			const channel = status & 0x0f;
+
+			let key;
+			let velocity;
+
+			switch (status & 0xf0) {
+				case 0x80:
+				case 0x90:
+					key = view.getUint8(index++);
+					velocity = view.getUint8(index++);
+
+					track.events.push({ deltaTime, type: status & 0xf0, channel, key, velocity });
+
+					break;
+				case 0xA0:
+					key = view.getUint8(index++);
+					var pressure = view.getUint8(index++);
+
+					track.events.push({ deltaTime, type: status & 0xf0, channel, key, pressure });
+					break;
+				case 0xB0:
+					var controller = view.getUint8(index++);
+					var value = view.getUint8(index++);
+
+					track.events.push({ deltaTime, type: status & 0xf0, channel, controller, value });
+					break;
+				case 0xC0:
+					var program = view.getUint8(index++);
+
+					track.events.push({ deltaTime, type: status & 0xf0, channel, program });
+					break;
+				case 0xD0:
+					var pressure = view.getUint8(index++);
+
+					track.events.push({ deltaTime, type: status & 0xf0, channel, pressure });
+					break;
+				case 0xE0:
+					var value = view.getUint16(index);
+					index += 2;
+
+					track.events.push({ deltaTime, type: status & 0xf0, channel, value });
+					break;
+				case 0xF0:
+					switch (status) {
+						case 0xF0:
+						case 0xF7:
+							console.error("Sysex Events not supported");
+							break;
+						case 0xFF:
+							const type = view.getUint8(index++);
+							const length = view.getUint8(index++);
+							let text;
+							if (type !== 0x00 && type < 0x08) {
+								text = getAsciiText(view, index, length);
+							}
+							switch (type) {
+								case 0x00:
+									meta.sequenceNumber = view.getUint16(index);
+									break;
+								case 0x01:
+								case 0x05:
+								case 0x06:
+								case 0x07:
+									track.events.push({ deltaTime, type: status, text });
+									break;
+								case 0x02:
+									meta.copyright = text;
+									break;
+								case 0x03:
+									meta.name = text;
+									break;
+								case 0x04:
+									meta.instrument = text;
+									break;
+								case 0x20:
+									const channel = view.getUint8(index);
+									if (!track.channelMeta) {
+										track.channelMeta = {};
+									}
+									if (!track.channelMeta[channel]) {
+										track.channelMeta[channel] = {};
+									}
+									meta = track.channelMeta[channel];
+									break;
+							}
+							index += length;
+							break;
+						default:
+							throw new Error("Unsupported Event Type " +  "0x" + status.toString(16) + " at 0x" + index.toString(16));
+					}
+					break;
+				default:
+					if (status < 0x80) {
+						// Continuation - "Running Mode"
+						index--; // backtrack
+						const prevChannel = prevStatus & 0x0F;
+						switch (prevStatus & 0xF0) {
+							case 0x80:
+							case 0x90:
+								key = view.getUint8(index++);
+								velocity = view.getUint8(index++);
+								track.events.push({ deltaTime, type: prevStatus & 0xf0, channel: prevChannel, key, velocity });
+								break;
+							case 0xA0:
+								key = view.getUint8(index++);
+								var pressure = view.getUint8(index++);
+
+								track.events.push({ deltaTime, type: prevStatus & 0xf0, channel: prevChannel, key, pressure });
+								break;
+							case 0xB0:
+								var controller = view.getUint8(index++);
+								var value = view.getUint8(index++);
+
+								track.events.push({ deltaTime, type: prevStatus & 0xf0, channel: prevChannel, controller, value });
+								break;
+							case 0xC0:
+								var program = view.getUint8(index++);
+
+								track.events.push({ deltaTime, type: prevStatus & 0xf0, channel: prevChannel, program });
+								break;
+							case 0xD0:
+								var pressure = view.getUint8(index++);
+
+								track.events.push({ deltaTime, type: prevStatus & 0xf0, channel: prevChannel, pressure });
+								break;
+							case 0xE0:
+								var value = view.getUint16(index);
+								index += 2;
+
+								track.events.push({ deltaTime, type: prevStatus & 0xf0, channel: prevChannel, value });
+								break;
+							case 0xF0:
+								switch (status) {
+									case 0xF0:
+									case 0xF7:
+										console.error("Sysex Continuation Events not supported");
+										break;
+									default:
+										console.error("Continuation Meta events?");
+								}
+								break;
+							default:
+								throw new Error("Unsupported Continuation Event Type " +  "0x" + prevStatus.toString(16) + " at 0x" + index.toString(16));
+
+						}
+					}
+					else {
+						throw new Error("Unsupported Event Type " + "0x" + status.toString(16) + " at 0x" + (index-1).toString(16));
+					}
+			}
+
+			if (status & 0x80) {
+				prevStatus = status;
+			}
+		}
+
+		trackNo++;
+		midi.tracks.push(track);
+	}
+
+	return midi;
+}
+
+function parseVariableLength (dataView, index) {
+	let value = 0;
+	let byte = dataView.getUint8(index++);
+
+	while (byte > 0x80) {
+		value = (value << 14) + ((byte & 0x7F) << 7)
+		byte = dataView.getUint8(index++);
+	}
+
+	value += byte;
+
+	return { value, index };
+}
+
+function getAsciiText(dataView, index, length) {
+	const arr = [];
+	for(let i = index; i < index + length; i++) {
+		const b = dataView.getUint8(i);
+		arr.push(String.fromCharCode(b));
+	}
+	return arr.join("");
 }
