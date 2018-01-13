@@ -17,14 +17,6 @@ class MidiNode {
 		const midi = parseMidi(this.buffer);
 		console.log(midi);
 
-		const concertPitch = 440; // Note A4, 440 Hz
-		const concertPitchMidiNum = 0x45;
-		const noteRatio = Math.exp(Math.LN2 / 12);
-
-		function getNoteFreq (num) {
-			return concertPitch * Math.pow(noteRatio, num - concertPitchMidiNum);
-		}
-
 		midi.tracks.forEach(track => {
 
 			let nextTime = when;
@@ -58,11 +50,14 @@ class MidiNode {
 			return;
 		}
 
-		const freq = getNoteFreq(key);
+		const concertPitch = 440; // Note A4, 440 Hz
+		const concertPitchMidiNum = 0x45; // MIDI Note Number 65, Middle C = 60
+		const noteRatio = Math.exp(Math.LN2 / 12);
 
-		const o = this.audioContext.createOscillator();
+		const freq = concertPitch * Math.pow(noteRatio, key - concertPitchMidiNum);
+
+		const o = createNote(this.audioContext, freq, velocity / 127);
 		o.connect(this.destination);
-		o.frequency.setValueAtTime(freq, when);
 		o.start(when);
 
 		oscillators[key] = o;
@@ -159,6 +154,10 @@ function parseMidi (buffer) {
 				index--;
 			}
 
+			if(typeof status === "undefined") {
+				throw new Error("Continuation Event found without previous event");
+			}
+
 			const eventRes = parseEvent(view, index, status);
 
 			if (eventRes.event) {
@@ -188,6 +187,8 @@ function parseMidi (buffer) {
 			}
 
 			index = eventRes.index;
+
+			prevStatus = status;
 		}
 
 		trackNo++;
@@ -353,4 +354,83 @@ function getAsciiText(dataView, index, length) {
 		arr.push(String.fromCharCode(b));
 	}
 	return arr.join("");
+}
+
+function createNote (audioCtx, freq, gain) {
+
+	const duration = 0.1;
+	const chord = false;
+	const smooth = false;
+
+	// Create an empty three-second stereo buffer at the sample rate of the AudioContext
+	var myArrayBuffer = audioCtx.createBuffer(2, audioCtx.sampleRate / freq, audioCtx.sampleRate);
+
+	for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
+	  // This gives us the actual array that contains the data
+	  var nowBuffering = myArrayBuffer.getChannelData(channel);
+	  for (var i = 0; i < myArrayBuffer.length; i++) {
+
+		let baseValue;
+		if (chord) {
+			baseValue = average(tone(freq, i), tone(freq*2, i), tone(freq*4, i));
+		} else {
+			baseValue = tone(freq, i);
+		}
+
+		let value;
+
+		if (smooth) {
+			const rampUpSamples = myArrayBuffer.length / 10;
+			if (i < rampUpSamples) {
+				// Ramp Up
+				value = baseValue *= (i / rampUpSamples);
+			} else if (i > (myArrayBuffer.length - rampUpSamples)) {
+				// Ramp Down
+				value = baseValue *= ((myArrayBuffer.length - i) / rampUpSamples);
+			}
+			else {
+				value = baseValue;
+			}
+		} else {
+			value = baseValue;
+		}
+
+		nowBuffering[i] = value;
+	  }
+	}
+
+	// Get an AudioBufferSourceNode.
+	// This is the AudioNode to use when we want to play an AudioBuffer
+	var source = audioCtx.createBufferSource();
+
+	// set the buffer in the AudioBufferSourceNode
+	source.buffer = myArrayBuffer;
+
+	source.loop = true;
+	source.loopLength = 1 / freq;
+
+	var gainNode = audioCtx.createGain();
+
+	source.connect(gainNode);
+
+	return {
+		connect: gainNode.connect.bind(gainNode),
+		start: when => {
+			source.start(when);
+			gainNode.gain.setValueAtTime(0, when);
+			gainNode.gain.setValueAtTime(gain, when + 0.1);
+		},
+		stop: when => {
+			source.stop(when + 0.1);
+			gainNode.gain.setValueAtTime(0, when + 0.1);
+		},
+	};
+
+	function tone (freq, i) {
+		return Math.sin(i * (freq / audioCtx.sampleRate) * Math.PI * 2);
+	}
+
+	function average() {
+		return Array.prototype.reduce.call(arguments, (a,b) => a + b, 0) / arguments.length;
+	}
 }
