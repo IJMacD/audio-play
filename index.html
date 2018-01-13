@@ -6,6 +6,11 @@
 <div id="keys"></div>
 <br>
 <input type="range" min="0" max="1" step="0.05" value="0.25" id="volume-input" />
+<br/>
+<input type="file" id="file-input" />
+<button id="play-btn">Play MIDI</button>
+<script src="midi.js"></script>
+<script src="sample.mid.js"></script>
 <script>
 
 const concertPitch = 440; // Note 49, A4, 440 Hz
@@ -59,19 +64,51 @@ document.addEventListener('keydown', function (e) {
     }
 });
 
+document.getElementById('play-btn').addEventListener('click', function () {
+	if (!audioCtx) {
+		initCtx();
+	}
+
+	const fileInput = document.getElementById('file-input');
+	if (fileInput.files && fileInput.files[0]) {
+		var reader = new FileReader();
+
+		reader.onload = function(e) {
+			const midiNode = new MidiNode(audioCtx);
+			midiNode.connect(gainNode);
+			midiNode.openFile(e.target.result);
+			midiNode.start();
+		}
+
+		reader.readAsArrayBuffer(fileInput.files[0]);
+	}
+	else {
+		const midiNode = new MidiNode(audioCtx);
+		midiNode.connect(gainNode);
+		midiNode.openFile(sample);
+		midiNode.start();
+	}
+
+});
+
+
 function playNoteNum(num) {
     return playNote(getNoteFreq(num));
 }
 
 let audioCtx, gainNode;
+function initCtx () {
+	audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+	gainNode = audioCtx.createGain();
+
+	gainNode.gain.setValueAtTime(0.25, 0);
+
+	gainNode.connect(audioCtx.destination);
+}
+
 function playNote (freq) {
 	if (!audioCtx) {
-		audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-		gainNode = audioCtx.createGain();
-
-		gainNode.gain.setValueAtTime(0.25, 0);
-
-		gainNode.connect(audioCtx.destination);
+		initCtx();
 	}
 
 	const duration = 1;
