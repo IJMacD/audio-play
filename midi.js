@@ -21,7 +21,7 @@ class MidiNode {
 
 			let nextTime = when;
 
-			const tempo = track.tempo || 500000;	// Microseconds per quater note (500000 = 120 bpm)
+			const tempo = track.tempo || 500000;	// Microseconds per quarter note (500000 = 120 bpm)
 
 			track.events.forEach(evt => {
 				nextTime += evt.deltaTime * ((tempo / midi.division) * 1e-6);
@@ -56,7 +56,8 @@ class MidiNode {
 
 		const freq = concertPitch * Math.pow(noteRatio, key - concertPitchMidiNum);
 
-		const o = createNote(this.audioContext, freq, velocity / 127, 0);
+        const select = document.getElementById('instrument-input');
+		const o = createNote(this.audioContext, freq, velocity / 127, parseInt(select.value, 10));
 		o.connect(this.destination);
 		o.start(when);
 
@@ -103,7 +104,7 @@ function parseMidi (buffer) {
 
 	const format = view.getUint16(8);
 	const trackCount = view.getUint16(10);
-	const division = view.getUint16(12);	// ticks per quater note
+	const division = view.getUint16(12);	// ticks per quarter note
 
 	const midi = { format, trackCount, division };
 
@@ -354,104 +355,4 @@ function getAsciiText(dataView, index, length) {
 		arr.push(String.fromCharCode(b));
 	}
 	return arr.join("");
-}
-
-function createNote (audioCtx, freq, gain, program) {
-
-	const source = getSource(audioCtx, freq, program);
-
-	const gainNode = audioCtx.createGain();
-	gainNode.gain.setValueAtTime(0, 0);
-
-	source.connect(gainNode);
-
-	return {
-		connect: gainNode.connect.bind(gainNode),
-		start: when => {
-			source.start(when);
-			gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
-		},
-		stop: when => {
-			source.stop(when + 0.1);
-			gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
-		},
-	};
-}
-
-function getSource (audioCtx, freq, program) {
-	let source;
-	switch (program) {
-		case 0:
-			source = audioCtx.createOscillator();
-			source.frequency.setValueAtTime(freq, 0);
-			source.type = "sine";
-			return source;
-		case 1:
-			source = audioCtx.createOscillator();
-			source.frequency.setValueAtTime(freq, 0);
-			source.type = "square";
-			return source;
-		case 2:
-			source = audioCtx.createOscillator();
-			source.frequency.setValueAtTime(freq, 0);
-			const real = new Float32Array(3);
-			const imag = new Float32Array(3);
-
-			real[0] = 0;
-			imag[0] = 0;
-			real[1] = 1;
-			imag[1] = 0;
-			real[2] = 0.2;
-			imag[2] = 0;
-
-			const wave = audioCtx.createPeriodicWave(real, imag);
-
-			source.setPeriodicWave(wave);
-			return source;
-		case 3:
-
-			const waveValue = fourier([0, 1, 0.2, 0.04, 0.0016])(freq, audioCtx.sampleRate);
-
-			// Create an empty three-second stereo buffer at the sample rate of the AudioContext
-			var myArrayBuffer = audioCtx.createBuffer(2, audioCtx.sampleRate / freq, audioCtx.sampleRate);
-
-			for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
-			  // This gives us the actual array that contains the data
-			  var nowBuffering = myArrayBuffer.getChannelData(channel);
-			  for (var i = 0; i < myArrayBuffer.length; i++) {
-
-				// nowBuffering[i] = average(tone(freq, i), 0.2 * tone(freq*2, i), 0.04 * tone(freq*4, i));
-				// nowBuffering[i] = (tone(freq, i) + 0.2 * tone(freq*1.5, i)) / 1.2;
-				nowBuffering[i] = waveValue(i);
-			  }
-			}
-
-			// Get an AudioBufferSourceNode.
-			// This is the AudioNode to use when we want to play an AudioBuffer
-			source = audioCtx.createBufferSource();
-
-			// set the buffer in the AudioBufferSourceNode
-			source.buffer = myArrayBuffer;
-
-			source.loop = true;
-			source.loopLength = 1 / freq;
-			return source;
-	}
-}
-
-function average() {
-	return Array.prototype.reduce.call(arguments, (a,b) => a + b, 0) / arguments.length;
-}
-
-function fourier (coef) {
-	const coefSum = coef.reduce((a,b) => a+b, 0);
-	if (coefSum === 0) {
-		throw Error("You must supply some coefficients");
-	}
-	return function (freq, sampleRate) {
-		const sampleCount = (freq / sampleRate);
-		return function (i) {
-			return coef.map((c,f) => (c / coefSum) * Math.sin(i * f * sampleCount * Math.PI * 2)).reduce((a,b) => a+b, 0);
-		}
-	}
 }

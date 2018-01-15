@@ -6,9 +6,17 @@
 <div id="keys"></div>
 <br>
 <input type="range" min="0" max="1" step="0.05" value="0.25" id="volume-input" />
+<select id="instrument-input">
+    <option value="0">Sine</option>
+    <option value="1">Square</option>
+    <option value="2">Periodic</option>
+    <option value="3">Organ</option>
+    <option value="4">Piano</option>
+</select>
 <br/>
 <input type="file" id="file-input" />
 <button id="play-btn">Play MIDI</button>
+<canvas id="wave-canvas" width="200" style="display: block; border: 1px solid black;"></canvas>
 <script src="midi.js"></script>
 <script src="sample.mid.js"></script>
 <script>
@@ -55,13 +63,59 @@ document.getElementById('volume-input').addEventListener('change', function (e) 
 	}
 });
 
+const noteMap = {};
+
+let audioCtx, gainNode;
+function initCtx () {
+	audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+	gainNode = audioCtx.createGain();
+
+	gainNode.gain.setValueAtTime(0.25, 0);
+
+	gainNode.connect(audioCtx.destination);
+}
+
 document.addEventListener('keydown', function (e) {
     const keyMap = '1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./ `';
-    const noteNum = keyMap.indexOf(e.key);
-    if (noteNum >= 0) {
-        playNoteNum(noteNum + 24);
-        console.log(getNoteName(noteNum + 24));
+    const noteNum = keyMap.indexOf(e.key) + 24;
+
+    if (!audioCtx) {
+        initCtx();
     }
+
+    if (noteNum < 24) {
+        return;
+    }
+
+    if (!noteMap[noteNum]) {
+
+        const select = document.getElementById('instrument-input');
+        const freq = getNoteFreq(noteNum);
+        const source = createNote(audioCtx, freq, 1, parseInt(select.value, 10));
+
+        // connect the AudioBufferSourceNode to the
+        // destination so we can hear the sound
+        source.connect(gainNode);
+
+        // start the source playing
+        source.start();
+
+        noteMap[noteNum] = source;
+    }
+});
+
+document.addEventListener('keyup', function (e) {
+    const keyMap = '1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./ `';
+    const noteNum = keyMap.indexOf(e.key) + 24;
+
+    if (noteNum < 24) {
+        return;
+    }
+
+	if (noteMap[noteNum]) {
+        noteMap[noteNum].stop();
+        noteMap[noteNum] = null;
+	}
 });
 
 document.getElementById('play-btn').addEventListener('click', function () {
@@ -91,73 +145,207 @@ document.getElementById('play-btn').addEventListener('click', function () {
 
 });
 
+function createNote (audioCtx, freq, gain, program) {
+	let source;
+	switch (program) {
+		case 0:
+        {
+			source = audioCtx.createOscillator();
+			source.frequency.setValueAtTime(freq, 0);
+			source.type = "sine";
 
-function playNoteNum(num) {
-    return playNote(getNoteFreq(num));
-}
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, 0);
 
-let audioCtx, gainNode;
-function initCtx () {
-	audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-	gainNode = audioCtx.createGain();
+            source.connect(gainNode);
+            return {
+                connect: gainNode.connect.bind(gainNode),
+                start: (when = audioCtx.currentTime) => {
+                    source.start(when);
+                    gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
+                },
+                stop: (when = audioCtx.currentTime) => {
+                    source.stop(when + 0.1);
+                    gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
+                },
+            };
+        }
+		case 1:
+        {
+			source = audioCtx.createOscillator();
+			source.frequency.setValueAtTime(freq, 0);
+			source.type = "square";
 
-	gainNode.gain.setValueAtTime(0.25, 0);
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, 0);
 
-	gainNode.connect(audioCtx.destination);
-}
+            source.connect(gainNode);
+            return {
+                connect: gainNode.connect.bind(gainNode),
+                start: (when = audioCtx.currentTime) => {
+                    source.start(when);
+                    gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
+                },
+                stop: (when = audioCtx.currentTime) => {
+                    source.stop(when + 0.1);
+                    gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
+                },
+            };
+        }
+		case 2:
+        {
+			source = audioCtx.createOscillator();
+			source.frequency.setValueAtTime(freq, 0);
+			const real = new Float32Array(3);
+			const imag = new Float32Array(3);
 
-function playNote (freq) {
-	if (!audioCtx) {
-		initCtx();
+			real[0] = 0;
+			imag[0] = 0;
+			real[1] = 1;
+			imag[1] = 0;
+			real[2] = 0.2;
+			imag[2] = 0;
+
+			const wave = audioCtx.createPeriodicWave(real, imag);
+
+			source.setPeriodicWave(wave);
+
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, 0);
+
+            source.connect(gainNode);
+            return {
+                connect: gainNode.connect.bind(gainNode),
+                start: (when = audioCtx.currentTime) => {
+                    source.start(when);
+                    gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
+                },
+                stop: (when = audioCtx.currentTime) => {
+                    source.stop(when + 0.1);
+                    gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
+                },
+            };
+        }
+		case 3:
+        {
+			var waveFn = fourier([0, 1, 0, 0.5]);
+            drawWave(waveFn);
+
+            const sampleCount = audioCtx.sampleRate / freq;
+            const wave = waveFn(sampleCount);
+
+			const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
+
+            // Get an AudioBufferSourceNode.
+            // This is the AudioNode to use when we want to play an AudioBuffer
+            source = audioCtx.createBufferSource();
+
+			// set the buffer in the AudioBufferSourceNode
+			source.buffer = myArrayBuffer;
+
+			source.loop = true;
+			source.loopLength = 1 / freq;
+
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, 0);
+
+            source.connect(gainNode);
+            return {
+                connect: gainNode.connect.bind(gainNode),
+                start: (when = audioCtx.currentTime) => {
+                    source.start(when);
+                    gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
+                },
+                stop: (when = audioCtx.currentTime) => {
+                    source.stop(when + 0.1);
+                    gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
+                },
+            };
+        }
+		case 4:
+        {
+			var waveFn = fourier([0, 1, 0, 0.2, 0, 0.04, 0, 0.08]);
+            drawWave(waveFn);
+
+            const duration = 2;
+            const waveCount = Math.floor(duration * freq);
+            const actualDuration = waveCount / freq;
+            const sampleCount = actualDuration * audioCtx.sampleRate;
+            const wave = waveFn(sampleCount / waveCount);
+
+			const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
+
+			// Get an AudioBufferSourceNode.
+			// This is the AudioNode to use when we want to play an AudioBuffer
+			source = audioCtx.createBufferSource();
+
+			// set the buffer in the AudioBufferSourceNode
+			source.buffer = myArrayBuffer;
+
+            const fadeNode = audioCtx.createGain();
+            fadeNode.gain.setValueAtTime(1, 0);
+
+            source.connect(fadeNode);
+
+            return {
+                connect: fadeNode.connect.bind(fadeNode),
+                start: (when = audioCtx.currentTime) => {
+                    source.start(when);
+                    fadeNode.gain.linearRampToValueAtTime(0.1, when + 1);
+                },
+                stop: (when = audioCtx.currentTime) => {
+                    source.stop(when + 1);
+                },
+            };
+
+			return source;
+        }
+        default:
+            throw Error("No program (instrument) selected");
 	}
+}
 
-	const duration = 1;
-	const chord = false;
-
-	// Create an empty three-second stereo buffer at the sample rate of the AudioContext
-	var myArrayBuffer = audioCtx.createBuffer(2, audioCtx.sampleRate * duration, audioCtx.sampleRate);
-
-	// Fill the buffer with white noise;
-	// just random values between -1.0 and 1.0
-	for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
-	  // This gives us the actual array that contains the data
-	  var nowBuffering = myArrayBuffer.getChannelData(channel);
-	  for (var i = 0; i < myArrayBuffer.length; i++) {
-		// Math.random() is in [0; 1.0]
-		// audio needs to be in [-1.0; 1.0]
-
-		let baseValue;
-		if (chord) {
-			baseValue = average(tone(freq, i), tone(freq*2, i), tone(freq*4, i));
-		} else {
-			baseValue = tone(freq, i);
+function fourier (coef) {
+	const coefSum = coef.reduce((a,b) => a+b, 0);
+	if (coefSum === 0) {
+		throw Error("You must supply some coefficients");
+	}
+	return function (sampleCount) {
+		return function (i) {
+			return coef.map((c,n) => (c / coefSum) * Math.sin(i * n / sampleCount * Math.PI * 2)).reduce((a,b) => a+b, 0);
 		}
-
-		nowBuffering[i] =  baseValue * Math.abs(Math.sin(i * ((1/duration) / audioCtx.sampleRate) * Math.PI));
-	  }
 	}
+}
 
-	// Get an AudioBufferSourceNode.
-	// This is the AudioNode to use when we want to play an AudioBuffer
-	var source = audioCtx.createBufferSource();
+function generateArrayBuffer(audioCtx, wave, sampleCount) {
 
-	// set the buffer in the AudioBufferSourceNode
-	source.buffer = myArrayBuffer;
+    // Create an empty stereo buffer at the sample rate of the AudioContext
+    var myArrayBuffer = audioCtx.createBuffer(2, sampleCount, audioCtx.sampleRate);
 
-	// connect the AudioBufferSourceNode to the
-	// destination so we can hear the sound
-	source.connect(gainNode);
+    for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
+      // This gives us the actual array that contains the data
+      var nowBuffering = myArrayBuffer.getChannelData(channel);
+      for (var i = 0; i < myArrayBuffer.length; i++) {
+        nowBuffering[i] = wave(i);
+      }
+    }
 
-	// start the source playing
-	source.start();
+    return myArrayBuffer;
+}
 
-	function tone (freq, i) {
-		return Math.sin(i * (freq / audioCtx.sampleRate) * Math.PI * 2);
-	}
+function drawWave (waveFn) {
+    const canvas = document.getElementById('wave-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-	function average() {
-		return Array.prototype.reduce.call(arguments, (a,b) => a + b, 0) / arguments.length;
-	}
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height / 2);
+
+    const wave = waveFn(canvas.width);
+    for(var i = 0; i < canvas.width; i++) {
+        ctx.lineTo(i, (-wave(i) + 1) * canvas.height / 2);
+    }
+    ctx.stroke();
 }
 </script>
 </body>
