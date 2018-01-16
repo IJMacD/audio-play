@@ -12,13 +12,16 @@
     <option value="2">Periodic</option>
     <option value="3">Organ</option>
     <option value="4">Piano</option>
+    <option value="5">Fourier In</option>
+    <option value="6">Fourier Out</option>
 </select>
 <br/>
 <input type="file" id="file-input" />
 <button id="play-btn">Play MIDI</button>
 <canvas id="wave-canvas" width="200" style="display: block; border: 1px solid black;"></canvas>
-<input type="text" id="fourier-values" value="0.9431 0.5606 -0.0415 -0.6273 -0.9674 -0.9285 -0.5258 0 0.5944 0.9561" />
+<input type="text" id="fourier-values" value="0.787 0.760 0.680 0.640 0.613 0.587 0.587 0.587 0.600 0.600 0.587 0.587 0.587 0.587 0.573 0.573 0.507 0.013 -0.360 -0.387 -0.480 -0.533 -0.533 -0.533 -0.520 -0.507 -0.480 -0.467 -0.467 -0.520 -0.707 -0.760 -0.693 -0.627 -0.440 -0.267 0.000 0.307 0.573 0.747 0.800" />
 <canvas id="fourier-in" width="200" style="display: block; border: 1px solid black;"></canvas>
+<p id="fourier-coef"></p>
 <canvas id="fourier-out" width="200" style="display: block; border: 1px solid black;"></canvas>
 <script src="midi.js"></script>
 <script src="sample.mid.js"></script>
@@ -293,7 +296,6 @@ function createNote (audioCtx, freq, gain, program) {
             const sampleCount = actualDuration * audioCtx.sampleRate;
             const wave = waveFn(sampleCount / waveCount);
 
-
 			const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
 
 			// Get an AudioBufferSourceNode.
@@ -316,6 +318,76 @@ function createNote (audioCtx, freq, gain, program) {
                     source.stop(when + 1);
                 },
                 stop: () => {},
+            };
+        }
+		case 5:
+        {
+            const duration = 1;
+            const sampleCount = duration * audioCtx.sampleRate;
+            const samplesPerCycle = Math.floor(audioCtx.sampleRate / freq);
+
+            const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
+
+            var myArrayBuffer = audioCtx.createBuffer(2, sampleCount, audioCtx.sampleRate);
+
+            for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
+            // This gives us the actual array that contains the data
+                var nowBuffering = myArrayBuffer.getChannelData(channel);
+                for (var i = 0; i < myArrayBuffer.length; i++) {
+                    const sampleNo = (i%samplesPerCycle);
+                    const frac = (sampleNo / samplesPerCycle) * values.length;
+                    const idx = Math.floor(frac);
+                    const delta = frac - idx;
+                    const next = idx < values.length - 1 ? values[idx+1] : values[0];
+                    nowBuffering[i] = (1-delta) * values[idx] + delta * next;
+                }
+            }
+
+			// Get an AudioBufferSourceNode.
+			// This is the AudioNode to use when we want to play an AudioBuffer
+			source = audioCtx.createBufferSource();
+
+			// set the buffer in the AudioBufferSourceNode
+			source.buffer = myArrayBuffer;
+
+            const fadeNode = audioCtx.createGain();
+            fadeNode.gain.setValueAtTime(1, 0);
+
+            source.connect(fadeNode);
+
+            return {
+                connect: fadeNode.connect.bind(fadeNode),
+                start: (when = audioCtx.currentTime) => {
+                    source.start(when);
+                    fadeNode.gain.linearRampToValueAtTime(0.01, when + 1);
+                    source.stop(when + 1);
+                },
+                stop: () => {},
+            };
+        }
+		case 6:
+        {
+			source = audioCtx.createOscillator();
+			source.frequency.setValueAtTime(freq, 0);
+
+			const wave = audioCtx.createPeriodicWave(Xk_re, Xk_im);
+
+			source.setPeriodicWave(wave);
+
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, 0);
+
+            source.connect(gainNode);
+            return {
+                connect: gainNode.connect.bind(gainNode),
+                start: (when = audioCtx.currentTime) => {
+                    source.start(when);
+                    gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
+                },
+                stop: (when = audioCtx.currentTime) => {
+                    source.stop(when + 0.1);
+                    gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
+                },
             };
         }
         default:
@@ -366,39 +438,83 @@ function drawWave (waveFn) {
     ctx.stroke();
 }
 
+let Xk_re, Xk_im;
 const fourierValues = document.getElementById('fourier-values');
 const canvas = document.getElementById('fourier-in');
-const ctx = canvas.getContext('2d');
-ctx.clearRect(0, 0, canvas.width, canvas.height);
+fourierValues.addEventListener("change", doFourier);
+doFourier();
 
-ctx.beginPath();
-ctx.moveTo(0, canvas.height / 2);
+canvas.addEventListener("click", function (e) {
+    const x = e.offsetX / e.target.width;
+    const y = 1 - (e.offsetY / e.target.height) * 2;
+    const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
+    const X = Math.floor((x * (values.length - 1)) + 0.5);
+    values[X] = y;
+    fourierValues.value = values.map(x => x.toFixed(3)).join(" ");
+    doFourier();
+});
 
-const values = fourierValues.value.split(" ");
-for(var i = 0; i < values.length; i++) {
-	ctx.lineTo(i * canvas.width / (values.length - 1), (-values[i] + 1) * canvas.height / 2);
+function doFourier () {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#CCCCCC";
+    for(var i = 0; i < values.length -1; i++) {
+        ctx.moveTo(((i+0.5) / (values.length - 1)) * canvas.width, 0);
+        ctx.lineTo(((i+0.5) / (values.length - 1)) * canvas.width, canvas.height);
+    }
+    ctx.stroke();
+
+    ctx.beginPath();
+    for(var i = 0; i < values.length; i++) {
+        ctx.lineTo(i * canvas.width / (values.length - 1), (-values[i] + 1) * canvas.height / 2);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = "#0080FF";
+    for(var i = 0; i < values.length; i++) {
+        ctx.beginPath();
+        ctx.arc(i * canvas.width / (values.length - 1), (-values[i] + 1) * canvas.height / 2, 2, 0, Math.PI*2, true);
+        ctx.fill();
+    }
+
+    // DCT-II
+    // X_k = #Sigma^N-1_n=0 {x_n * [ cos(#pi / N * (n + 0.5) * k) ]}
+    const N = values.length;
+    // let Xk = values.map((_,k) => Math.sqrt(2/N) * values.map((xn,n) => xn * Math.cos(Math.PI / N * k * (n + 0.5)) ).reduce((a,b) => a+b, 0) );
+    // Xk[0] *= Math.SQRT1_2;
+    // Xk = [0,1];
+    // console.log(Xk);
+
+    const range = n => [...Array(n).keys()];
+
+    // Fourier
+    // n.b. Wiki says inverse is 1/N but for some reason that results in range -0.5 to 0.5
+    Xk_re = Float32Array.from(range(N-1).map(k => 2/N * values.map((xn,n) => xn * Math.cos(2 * Math.PI * k * n / N) ).reduce((a,b) => a+b, 0) ));
+    Xk_im = Float32Array.from(range(N-1).map(k => 2/N * values.map((xn,n) => xn * Math.sin(2 * Math.PI * k * n / N) ).reduce((a,b) => a+b, 0) ));
+
+    // x=0 to x=N-1???
+    Xk_re.length -= 1;
+    Xk_im.length -= 1;
+
+    document.getElementById("fourier-coef").innerHTML = Xk_re.map(x => x.toFixed(2)).join() + "<br>" + Xk_im.map(x => x.toFixed(2)).join();
+
+    const canvas2 = document.getElementById('fourier-out');
+    const ctx2 = canvas2.getContext('2d');
+    ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
+
+    ctx2.beginPath();
+
+    for(var i = 0; i < canvas2.width; i++) {
+        const x = i / canvas2.width * Math.PI * 2;
+        const value = Xk_re.map((X_k, k) => X_k * Math.cos(x * k)).reduce((a,b) => a+b) + Xk_im.map((X_k, k) => X_k * Math.sin(x * k)).reduce((a,b) => a+b);
+        ctx2.lineTo(i, (-value + 1) * canvas2.height / 2);
+    }
+    ctx2.stroke();
 }
-ctx.stroke();
-
-// DCT-II
-// X_k = #Sigma^N-1_n=0 {x_n * [ cos(#pi / N * (n + 0.5) * k) ]}
-const N = values.length;
-const Xk = values.map((_,k) => values.map((xn,n) => xn * Math.cos(Math.PI / N * k * (n + 0.5)) ).reduce((a,b) => a+b, 0) )
-console.log(Xk);
-
-const canvas2 = document.getElementById('fourier-out');
-const ctx2 = canvas2.getContext('2d');
-ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
-
-ctx2.beginPath();
-ctx2.moveTo(0, canvas2.height / 2);
-
-for(var i = 0; i < canvas2.width; i++) {
-	const x = i / canvas2.width * Math.PI * 2;
-	const value = Xk[0] + Xk[1] * Math.cos(x);// + Xk[2] * Math.cos(x / 2) +  Xk[3] * Math.cos(x / 3);
-	ctx2.lineTo(i, (-value + 1) * canvas2.height / 2);
-}
-ctx2.stroke();
 </script>
 </body>
 </html>
