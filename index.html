@@ -175,6 +175,8 @@ function createNote (audioCtx, freq, gain, program) {
 			source.frequency.setValueAtTime(freq, 0);
 			source.type = "sine";
 
+            drawWave(fourier([0,1]));
+
             const gainNode = audioCtx.createGain();
             gainNode.gain.setValueAtTime(0, 0);
 
@@ -217,36 +219,58 @@ function createNote (audioCtx, freq, gain, program) {
         {
 			source = audioCtx.createOscillator();
 			source.frequency.setValueAtTime(freq, 0);
-			const real = new Float32Array(4);
-			const imag = new Float32Array(4);
+			const real = new Float32Array(6);
+			const imag = new Float32Array(6);
 
 			real[0] = 0;
 			imag[0] = 0;
 			real[1] = 0;
-			imag[1] = 1;
+			imag[1] = 131;
 			real[2] = 0;
-			imag[2] = 0;
+			imag[2] = 27;
 			real[3] = 0;
-			imag[3] = 0.5;
+			imag[3] = 37;
+			real[4] = 0;
+			imag[4] = 14;
+			real[5] = 0;
+			imag[5] = 10;
+
+            const fFn = fourier(imag.map(x=> x/131));
+            drawWave(fFn);
 
 			const wave = audioCtx.createPeriodicWave(real, imag);
 
 			source.setPeriodicWave(wave);
 
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0, 0);
+            // const gainNode = audioCtx.createGain();
+            // gainNode.gain.setValueAtTime(0, 0);
 
-            source.connect(gainNode);
+            // source.connect(gainNode);
+            // return {
+            //     connect: gainNode.connect.bind(gainNode),
+            //     start: (when = audioCtx.currentTime) => {
+            //         source.start(when);
+            //         gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
+            //     },
+            //     stop: (when = audioCtx.currentTime) => {
+            //         source.stop(when + 0.1);
+            //         gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
+            //     },
+            // };
+
+            const fadeNode = audioCtx.createGain();
+            fadeNode.gain.setValueAtTime(1, 0);
+
+            source.connect(fadeNode);
+
             return {
-                connect: gainNode.connect.bind(gainNode),
+                connect: fadeNode.connect.bind(fadeNode),
                 start: (when = audioCtx.currentTime) => {
                     source.start(when);
-                    gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
+                    fadeNode.gain.exponentialRampToValueAtTime(0.01, when + 1);
+                    source.stop(when + 1);
                 },
-                stop: (when = audioCtx.currentTime) => {
-                    source.stop(when + 0.1);
-                    gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
-                },
+                stop: () => {},
             };
         }
 		case 3:
