@@ -34,9 +34,14 @@ for (let i = 0; i < 96; i++) {
     const btn = document.createElement('button');
     const num = i;
     btn.innerText = getNoteName(num);
-    btn.addEventListener('click', function (e){
-        playNote(getNoteFreq(num));
-        console.log(getNoteName(num));
+    btn.addEventListener('mousedown', function (e){
+        noteOn(num);
+    });
+    btn.addEventListener('mouseup', function (e){
+        noteOff(num);
+    });
+    btn.addEventListener('mouseleave', function (e){
+        noteOff(num);
     });
     keysDiv.appendChild(btn);
 
@@ -78,22 +83,16 @@ function initCtx () {
 	gainNode.connect(audioCtx.destination);
 }
 
-document.addEventListener('keydown', function (e) {
-    const keyMap = '1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./ `';
-    const noteNum = keyMap.indexOf(e.key) + 24;
+function noteOn (num) {
 
     if (!audioCtx) {
         initCtx();
     }
 
-    if (noteNum < 24) {
-        return;
-    }
-
-    if (!noteMap[noteNum]) {
+    if (!noteMap[num]) {
 
         const select = document.getElementById('instrument-input');
-        const freq = getNoteFreq(noteNum);
+        const freq = getNoteFreq(num);
         const source = createNote(audioCtx, freq, 1, parseInt(select.value, 10));
 
         // connect the AudioBufferSourceNode to the
@@ -103,22 +102,38 @@ document.addEventListener('keydown', function (e) {
         // start the source playing
         source.start();
 
-        noteMap[noteNum] = source;
+        noteMap[num] = source;
     }
+}
+
+function noteOff (num) {
+
+	if (noteMap[num]) {
+        noteMap[num].stop();
+        noteMap[num] = null;
+	}
+}
+
+const keyMap = '`1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./ ';
+
+document.addEventListener('keydown', function (e) {
+    const index = keyMap.indexOf(e.key);
+
+    if (index < 0) {
+        return;
+    };
+
+    noteOn(index + 23);
 });
 
 document.addEventListener('keyup', function (e) {
-    const keyMap = '1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./ `';
-    const noteNum = keyMap.indexOf(e.key) + 24;
+    const index = keyMap.indexOf(e.key);
 
-    if (noteNum < 24) {
+    if (index < 0) {
         return;
-    }
+    };
 
-	if (noteMap[noteNum]) {
-        noteMap[noteNum].stop();
-        noteMap[noteNum] = null;
-	}
+    noteOff(index + 23);
 });
 
 document.getElementById('play-btn').addEventListener('click', function () {
@@ -199,15 +214,17 @@ function createNote (audioCtx, freq, gain, program) {
         {
 			source = audioCtx.createOscillator();
 			source.frequency.setValueAtTime(freq, 0);
-			const real = new Float32Array(3);
-			const imag = new Float32Array(3);
+			const real = new Float32Array(4);
+			const imag = new Float32Array(4);
 
 			real[0] = 0;
 			imag[0] = 0;
-			real[1] = 1;
-			imag[1] = 0;
-			real[2] = 0.2;
+			real[1] = 0;
+			imag[1] = 1;
+			real[2] = 0;
 			imag[2] = 0;
+			real[3] = 0;
+			imag[3] = 0.5;
 
 			const wave = audioCtx.createPeriodicWave(real, imag);
 
