@@ -17,6 +17,9 @@
 <input type="file" id="file-input" />
 <button id="play-btn">Play MIDI</button>
 <canvas id="wave-canvas" width="200" style="display: block; border: 1px solid black;"></canvas>
+<input type="text" id="fourier-values" value="0.9431 0.5606 -0.0415 -0.6273 -0.9674 -0.9285 -0.5258 0 0.5944 0.9561" />
+<canvas id="fourier-in" width="200" style="display: block; border: 1px solid black;"></canvas>
+<canvas id="fourier-out" width="200" style="display: block; border: 1px solid black;"></canvas>
 <script src="midi.js"></script>
 <script src="sample.mid.js"></script>
 <script>
@@ -267,11 +270,12 @@ function createNote (audioCtx, freq, gain, program) {
 			var waveFn = fourier([0, 1, 0, 0.2, 0, 0.04, 0, 0.08]);
             drawWave(waveFn);
 
-            const duration = 2;
+            const duration = 1;
             const waveCount = Math.floor(duration * freq);
             const actualDuration = waveCount / freq;
             const sampleCount = actualDuration * audioCtx.sampleRate;
             const wave = waveFn(sampleCount / waveCount);
+
 
 			const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
 
@@ -291,14 +295,11 @@ function createNote (audioCtx, freq, gain, program) {
                 connect: fadeNode.connect.bind(fadeNode),
                 start: (when = audioCtx.currentTime) => {
                     source.start(when);
-                    fadeNode.gain.linearRampToValueAtTime(0.1, when + 1);
-                },
-                stop: (when = audioCtx.currentTime) => {
+                    fadeNode.gain.linearRampToValueAtTime(0.01, when + 1);
                     source.stop(when + 1);
                 },
+                stop: () => {},
             };
-
-			return source;
         }
         default:
             throw Error("No program (instrument) selected");
@@ -347,6 +348,40 @@ function drawWave (waveFn) {
     }
     ctx.stroke();
 }
+
+const fourierValues = document.getElementById('fourier-values');
+const canvas = document.getElementById('fourier-in');
+const ctx = canvas.getContext('2d');
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+ctx.beginPath();
+ctx.moveTo(0, canvas.height / 2);
+
+const values = fourierValues.value.split(" ");
+for(var i = 0; i < values.length; i++) {
+	ctx.lineTo(i * canvas.width / (values.length - 1), (-values[i] + 1) * canvas.height / 2);
+}
+ctx.stroke();
+
+// DCT-II
+// X_k = #Sigma^N-1_n=0 {x_n * [ cos(#pi / N * (n + 0.5) * k) ]}
+const N = values.length;
+const Xk = values.map((_,k) => values.map((xn,n) => xn * Math.cos(Math.PI / N * k * (n + 0.5)) ).reduce((a,b) => a+b, 0) )
+console.log(Xk);
+
+const canvas2 = document.getElementById('fourier-out');
+const ctx2 = canvas2.getContext('2d');
+ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
+
+ctx2.beginPath();
+ctx2.moveTo(0, canvas2.height / 2);
+
+for(var i = 0; i < canvas2.width; i++) {
+	const x = i / canvas2.width * Math.PI * 2;
+	const value = Xk[0] + Xk[1] * Math.cos(x);// + Xk[2] * Math.cos(x / 2) +  Xk[3] * Math.cos(x / 3);
+	ctx2.lineTo(i, (-value + 1) * canvas2.height / 2);
+}
+ctx2.stroke();
 </script>
 </body>
 </html>
