@@ -1,6 +1,7 @@
 class MidiNode {
-	constructor (audioContext) {
+	constructor (audioContext, synth) {
 		this.audioContext = audioContext;
+		this.synth = synth;
 	}
 
 	openFile (buffer) {
@@ -27,56 +28,13 @@ class MidiNode {
 				nextTime += evt.deltaTime * ((tempo / midi.division) * 1e-6);
 
 				if (evt.type === 0x80) {
-					this.noteOff(nextTime, evt.channel, evt.key, evt.velocity);
+					this.synth.noteOff(evt.key - 17, nextTime, evt.velocity / 127);
 				}
 				else if (evt.type === 0x90) {
-					this.noteOn(nextTime, evt.channel, evt.key, evt.velocity);
+					this.synth.noteOn(evt.key - 17, nextTime, evt.velocity / 127);
 				}
 			});
 		})
-	}
-
-	noteOn (when, channel, key, velocity) {
-		if (!this.channels) {
-			this.channels = {};
-		}
-		if (!this.channels[channel]) {
-			this.channels[channel] = {};
-		}
-		const oscillators = this.channels[channel];
-
-		if (oscillators[key]) {
-			// If the note is already on, do nothing
-			return;
-		}
-
-		const concertPitch = 440; // Note A4, 440 Hz
-		const concertPitchMidiNum = 0x45; // MIDI Note Number 65, Middle C = 60
-		const noteRatio = Math.exp(Math.LN2 / 12);
-
-		const freq = concertPitch * Math.pow(noteRatio, key - concertPitchMidiNum);
-
-        const select = document.getElementById('instrument-input');
-		const o = createNote(this.audioContext, freq, velocity / 127, parseInt(select.value, 10));
-		o.connect(this.destination);
-		o.start(when);
-
-		oscillators[key] = o;
-	}
-
-	noteOff (when, channel, key, velocity) {
-		if (!this.channels) {
-			this.channels = {};
-		}
-		if (!this.channels[channel]) {
-			this.channels[channel] = {};
-		}
-		const oscillators = this.channels[channel];
-
-		if (oscillators[key]) {
-			oscillators[key].stop(when);
-			oscillators[key] = null;
-		}
 	}
 }
 

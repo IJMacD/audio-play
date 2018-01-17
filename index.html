@@ -28,6 +28,7 @@
 <script src="midi.js"></script>
 <script src="sample.mid.js"></script>
 <script>
+"use strict";
 
 const concertPitch = 440; // Note 49, A4, 440 Hz
 const concertPitchNum = 48; // (0 index)
@@ -40,13 +41,13 @@ for (let i = 0; i < 96; i++) {
     const num = i;
     btn.innerText = getNoteName(num);
     btn.addEventListener('mousedown', function (e){
-        noteOn(num);
+        synth.noteOn(num);
     });
     btn.addEventListener('mouseup', function (e){
-        noteOff(num);
+        synth.noteOff(num);
     });
     btn.addEventListener('mouseleave', function (e){
-        noteOff(num);
+        synth.noteOff(num);
     });
     keysDiv.appendChild(btn);
 
@@ -67,9 +68,6 @@ function getNoteName (num) {
     return alpha + sharp + octave;
 }
 
-for(const btn of document.getElementsByClassName('play-btn')) {
-}
-
 document.getElementById('volume-input').addEventListener('change', function (e) {
 	if (gainNode) {
 		gainNode.gain.linearRampToValueAtTime(e.target.value, audioCtx.currentTime + 1);
@@ -86,38 +84,48 @@ function initCtx () {
 	gainNode.gain.setValueAtTime(0.25, 0);
 
 	gainNode.connect(audioCtx.destination);
-}
 
-function noteOn (num) {
 
-    if (!audioCtx) {
-        initCtx();
-    }
 
-    if (!noteMap[num]) {
 
-        const select = document.getElementById('instrument-input');
-        const freq = getNoteFreq(num);
-        const source = createNote(audioCtx, freq, 1, parseInt(select.value, 10));
 
-        // connect the AudioBufferSourceNode to the
-        // destination so we can hear the sound
-        source.connect(gainNode);
 
-        // start the source playing
-        source.start();
 
-        noteMap[num] = source;
     }
 }
 
-function noteOff (num) {
+const synth = {
+    noteOn (num, when, gain=1) {
 
-	if (noteMap[num]) {
-        noteMap[num].stop();
-        noteMap[num] = null;
-	}
-}
+        if (!audioCtx) {
+            initCtx();
+        }
+
+        if (!noteMap[num]) {
+
+            const select = document.getElementById('instrument-input');
+            const freq = getNoteFreq(num);
+            const source = createNote(audioCtx, freq, gain, parseInt(select.value, 10));
+
+            // connect the AudioBufferSourceNode to the
+            // destination so we can hear the sound
+            source.connect(gainNode);
+
+            // start the source playing
+            source.start(when);
+
+            noteMap[num] = source;
+        }
+    },
+
+    noteOff (num, when) {
+
+        if (noteMap[num]) {
+            noteMap[num].stop(when);
+            noteMap[num] = null;
+        }
+    },
+};
 
 const keyMap = '`1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./';
 
@@ -129,7 +137,7 @@ document.addEventListener('keydown', function (e) {
     };
 
     e.preventDefault();
-    noteOn(index + 23);
+    synth.noteOn(index + 23);
 });
 
 document.addEventListener('keyup', function (e) {
@@ -140,7 +148,7 @@ document.addEventListener('keyup', function (e) {
     };
 
     e.preventDefault();
-    noteOff(index + 23);
+    synth.noteOff(index + 23);
 });
 
 document.getElementById('play-btn').addEventListener('click', function () {
@@ -153,7 +161,7 @@ document.getElementById('play-btn').addEventListener('click', function () {
 		var reader = new FileReader();
 
 		reader.onload = function(e) {
-			const midiNode = new MidiNode(audioCtx);
+			const midiNode = new MidiNode(audioCtx, synth);
 			midiNode.connect(gainNode);
 			midiNode.openFile(e.target.result);
 			midiNode.start();
@@ -162,7 +170,7 @@ document.getElementById('play-btn').addEventListener('click', function () {
 		reader.readAsArrayBuffer(fileInput.files[0]);
 	}
 	else {
-		const midiNode = new MidiNode(audioCtx);
+		const midiNode = new MidiNode(audioCtx, synth);
 		midiNode.connect(gainNode);
 		midiNode.openFile(sample);
 		midiNode.start();
@@ -493,9 +501,6 @@ function doFourier () {
     Xk_re = Float32Array.from(range(N-1).map(k => 2/N * values.map((xn,n) => xn * Math.cos(2 * Math.PI * k * n / N) ).reduce((a,b) => a+b, 0) ));
     Xk_im = Float32Array.from(range(N-1).map(k => 2/N * values.map((xn,n) => xn * Math.sin(2 * Math.PI * k * n / N) ).reduce((a,b) => a+b, 0) ));
 
-    // x=0 to x=N-1???
-    Xk_re.length -= 1;
-    Xk_im.length -= 1;
 
     document.getElementById("fourier-coef").innerHTML = Xk_re.map(x => x.toFixed(2)).join() + "<br>" + Xk_im.map(x => x.toFixed(2)).join();
 
