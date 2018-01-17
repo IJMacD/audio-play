@@ -526,7 +526,15 @@ const canvas = document.getElementById('fourier-in');
 fourierValues.addEventListener("change", doFourier);
 doFourier();
 
-canvas.addEventListener("click", function (e) {
+canvas.addEventListener("click", handleFourierInput);
+
+canvas.addEventListener("mousemove", function (e) {
+    if (e.which === 1) {
+        handleFourierInput(e);
+    }
+});
+
+function handleFourierInput (e) {
     const x = e.offsetX / e.target.width;
     const y = 1 - (e.offsetY / e.target.height) * 2;
     const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
@@ -534,7 +542,7 @@ canvas.addEventListener("click", function (e) {
     values[X] = y;
     fourierValues.value = values.map(x => x.toFixed(3)).join(" ");
     doFourier();
-});
+}
 
 function doFourier () {
     const ctx = canvas.getContext('2d');
