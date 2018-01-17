@@ -264,11 +264,8 @@ function getInstrument (audioCtx, program) {
                 var waveFn = fourier([0, 1, 0, 0.2, 0, 0.04, 0, 0.08]);
                 drawWave(waveFn);
 
-                const duration = 1;
-                const waveCount = Math.floor(duration * freq);
-                const actualDuration = waveCount / freq;
-                const sampleCount = actualDuration * audioCtx.sampleRate;
-                const wave = waveFn(sampleCount / waveCount);
+                const sampleCount = audioCtx.sampleRate / freq;
+                const wave = waveFn(sampleCount);
 
                 const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
 
@@ -278,6 +275,9 @@ function getInstrument (audioCtx, program) {
 
                 // set the buffer in the AudioBufferSourceNode
                 source.buffer = myArrayBuffer;
+
+                source.loop = true;
+                source.loopLength = 1 / freq;
 
                 return document.getElementById("impact-input").checked ?
                     impactNote(audioCtx, source, gain) :
