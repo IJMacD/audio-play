@@ -20,6 +20,8 @@
 <br/>
 <input type="file" id="file-input" />
 <button id="play-btn">Play MIDI</button>
+<canvas id="scope-canvas" width="256" style="display: block; border: 1px solid black;"></canvas>
+<canvas id="freq-canvas" width="256" style="display: block; border: 1px solid black;"></canvas>
 <canvas id="wave-canvas" width="200" style="display: block; border: 1px solid black;"></canvas>
 <input type="text" id="fourier-values" value="0.000 0.307 0.573 0.747 0.800 0.787 0.760 0.680 0.640 0.613 0.587 0.587 0.587 0.600 0.600 0.587 0.587 0.587 0.587 0.573 0.573 0.507 0.013 -0.360 -0.387 -0.480 -0.533 -0.533 -0.533 -0.520 -0.507 -0.480 -0.467 -0.467 -0.520 -0.707 -0.760 -0.693 -0.627 -0.440 -0.267 " />
 <canvas id="fourier-in" width="200" style="display: block; border: 1px solid black;"></canvas>
@@ -83,14 +85,60 @@ function initCtx () {
 
 	gainNode.gain.setValueAtTime(0.25, 0);
 
-	gainNode.connect(audioCtx.destination);
+    const analyser = audioCtx.createAnalyser();
 
+    gainNode.connect(analyser);
+    analyser.connect(audioCtx.destination);
 
+    const timeCanvas = document.getElementById("scope-canvas");
+    const tCtx = timeCanvas.getContext("2d");
 
+    const freqCanvas = document.getElementById("freq-canvas");
+    const fCtx = freqCanvas.getContext("2d");
 
+    const count = 1024;
+    analyser.fftSize = count;
+    const buffer = new Float32Array(analyser.frequencyBinCount);
 
+    scope();
 
+    function scope() {
+        requestAnimationFrame(scope);
 
+        analyser.getFloatTimeDomainData(buffer);
+
+        tCtx.clearRect(0, 0, timeCanvas.width, timeCanvas.height);
+
+        tCtx.beginPath();
+
+        for(let i = 0; i < buffer.length; i++) {
+            const y = (1-buffer[i]) * timeCanvas.height / 2;
+            if (i === 0) {
+                tCtx.moveTo(0, y);
+            } else
+            {
+                tCtx.lineTo(i / buffer.length * timeCanvas.width, y);
+            }
+        }
+        tCtx.stroke();
+
+        analyser.getFloatFrequencyData(buffer);
+
+        fCtx.clearRect(0, 0, freqCanvas.width, freqCanvas.height);
+
+        fCtx.beginPath();
+
+        const usefulBucketCount = buffer.length / 4;
+        for(let i = 0; i < usefulBucketCount; i++) {
+            const y = (1-buffer[i]) * 0.01 * freqCanvas.height / 2;
+            if (i === 0) {
+                fCtx.moveTo(0, y);
+            } else
+            {
+                fCtx.lineTo(i / (usefulBucketCount - 1) * freqCanvas.width, y);
+            }
+        }
+        fCtx.stroke();
     }
 }
 
@@ -193,12 +241,32 @@ const instruments = {
         source.frequency.setValueAtTime(freq, 0);
         source.type = "square";
 
+        const canvas = document.getElementById('wave-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(canvas.width / 2, 0);
+        ctx.lineTo(canvas.width / 2, canvas.height);
+        ctx.lineTo(canvas.width, canvas.height);
+        ctx.stroke();
+
         return source;
     },
     sawtooth (freq) {
         const source = audioCtx.createOscillator();
         source.frequency.setValueAtTime(freq, 0);
         source.type = "sawtooth";
+
+        const canvas = document.getElementById('wave-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height);
+        ctx.lineTo(canvas.width, 0);
+        ctx.stroke();
 
         return source;
     },
@@ -286,12 +354,27 @@ const instruments = {
             }
         }
 
+        const canvas = document.getElementById('wave-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.beginPath();
+        ctx.moveTo(0, (1-values[0]) * canvas.height / 2);
+
+        for(var i = 1; i < values.length; i++) {
+            ctx.lineTo(i / (values.length - 1) * canvas.width, (1-values[i]) * canvas.height / 2);
+        }
+        ctx.stroke();
+
         // Get an AudioBufferSourceNode.
         // This is the AudioNode to use when we want to play an AudioBuffer
         const source = audioCtx.createBufferSource();
 
         // set the buffer in the AudioBufferSourceNode
         source.buffer = myArrayBuffer;
+
+        source.loop = true;
+        source.loopLength = 1 / freq;
 
         return source;
     },
@@ -300,6 +383,8 @@ const instruments = {
         source.frequency.setValueAtTime(freq, 0);
 
         const wave = audioCtx.createPeriodicWave(Xk_re, Xk_im);
+
+        drawWave(fourier(Xk_im));
 
         source.setPeriodicWave(wave);
 
