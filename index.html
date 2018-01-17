@@ -273,24 +273,16 @@ const instruments = {
         return source;
     },
     fourierIn (freq) {
-        const duration = 1;
-        const sampleCount = duration * audioCtx.sampleRate;
-        const samplesPerCycle = Math.floor(audioCtx.sampleRate / freq);
 
         const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
 
-        var myArrayBuffer = audioCtx.createBuffer(2, sampleCount, audioCtx.sampleRate);
+        var myArrayBuffer = audioCtx.createBuffer(2, values.length, values.length * freq);
 
         for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
         // This gives us the actual array that contains the data
             var nowBuffering = myArrayBuffer.getChannelData(channel);
             for (var i = 0; i < myArrayBuffer.length; i++) {
-                const sampleNo = (i%samplesPerCycle);
-                const frac = (sampleNo / samplesPerCycle) * values.length;
-                const idx = Math.floor(frac);
-                const delta = frac - idx;
-                const next = idx < values.length - 1 ? values[idx+1] : values[0];
-                nowBuffering[i] = (1-delta) * values[idx] + delta * next;
+                nowBuffering[i] = values[i];
             }
         }
 
