@@ -120,7 +120,7 @@ function noteOff (num) {
 const keyMap = '`1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./ ';
 
 document.addEventListener('keydown', function (e) {
-    const index = keyMap.indexOf(e.key);
+    const index = e.key === "#" ? 25 : keyMap.indexOf(e.key);
 
     if (index < 0) {
         return;
@@ -130,7 +130,7 @@ document.addEventListener('keydown', function (e) {
 });
 
 document.addEventListener('keyup', function (e) {
-    const index = keyMap.indexOf(e.key);
+    const index = e.key === "#" ? 25 : keyMap.indexOf(e.key);
 
     if (index < 0) {
         return;
