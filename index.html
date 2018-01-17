@@ -9,17 +9,19 @@
 <select id="instrument-input">
     <option value="0">Sine</option>
     <option value="1">Square</option>
-    <option value="2">Periodic</option>
-    <option value="3">Organ</option>
-    <option value="4">Piano</option>
-    <option value="5">Fourier In</option>
-    <option value="6">Fourier Out</option>
+    <option value="2">Sawtooth</option>
+    <option value="3">Periodic</option>
+    <option value="4">Organ</option>
+    <option value="5">Piano</option>
+    <option value="6">Fourier In</option>
+    <option value="7">Fourier Out</option>
 </select>
+<label>Impact <input type="checkbox" id="impact-input" /></label>
 <br/>
 <input type="file" id="file-input" />
 <button id="play-btn">Play MIDI</button>
 <canvas id="wave-canvas" width="200" style="display: block; border: 1px solid black;"></canvas>
-<input type="text" id="fourier-values" value="0.787 0.760 0.680 0.640 0.613 0.587 0.587 0.587 0.600 0.600 0.587 0.587 0.587 0.587 0.573 0.573 0.507 0.013 -0.360 -0.387 -0.480 -0.533 -0.533 -0.533 -0.520 -0.507 -0.480 -0.467 -0.467 -0.520 -0.707 -0.760 -0.693 -0.627 -0.440 -0.267 0.000 0.307 0.573 0.747 0.800" />
+<input type="text" id="fourier-values" value="0.000 0.307 0.573 0.747 0.800 0.787 0.760 0.680 0.640 0.613 0.587 0.587 0.587 0.600 0.600 0.587 0.587 0.587 0.587 0.573 0.573 0.507 0.013 -0.360 -0.387 -0.480 -0.533 -0.533 -0.533 -0.520 -0.507 -0.480 -0.467 -0.467 -0.520 -0.707 -0.760 -0.693 -0.627 -0.440 -0.267 " />
 <canvas id="fourier-in" width="200" style="display: block; border: 1px solid black;"></canvas>
 <p id="fourier-coef"></p>
 <canvas id="fourier-out" width="200" style="display: block; border: 1px solid black;"></canvas>
@@ -117,7 +119,7 @@ function noteOff (num) {
 	}
 }
 
-const keyMap = '`1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./ ';
+const keyMap = '`1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./';
 
 document.addEventListener('keydown', function (e) {
     const index = e.key === "#" ? 25 : keyMap.indexOf(e.key);
@@ -126,6 +128,7 @@ document.addEventListener('keydown', function (e) {
         return;
     };
 
+    e.preventDefault();
     noteOn(index + 23);
 });
 
@@ -136,6 +139,7 @@ document.addEventListener('keyup', function (e) {
         return;
     };
 
+    e.preventDefault();
     noteOff(index + 23);
 });
 
@@ -166,257 +170,223 @@ document.getElementById('play-btn').addEventListener('click', function () {
 
 });
 
-function createNote (audioCtx, freq, gain, program) {
-	let source;
-	switch (program) {
-		case 0:
-        {
-			source = audioCtx.createOscillator();
-			source.frequency.setValueAtTime(freq, 0);
-			source.type = "sine";
+function getInstrument (audioCtx, program) {
+    switch (program) {
+		case 0: // Sine
+            return function (freq, gain) {
+                const source = audioCtx.createOscillator();
+                source.frequency.setValueAtTime(freq, 0);
+                source.type = "sine";
 
-            drawWave(fourier([0,1]));
+                drawWave(fourier([0,1]));
 
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0, 0);
-
-            source.connect(gainNode);
-            return {
-                connect: gainNode.connect.bind(gainNode),
-                start: (when = audioCtx.currentTime) => {
-                    source.start(when);
-                    gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
-                },
-                stop: (when = audioCtx.currentTime) => {
-                    source.stop(when + 0.1);
-                    gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
-                },
-            };
-        }
-		case 1:
-        {
-			source = audioCtx.createOscillator();
-			source.frequency.setValueAtTime(freq, 0);
-			source.type = "square";
-
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0, 0);
-
-            source.connect(gainNode);
-            return {
-                connect: gainNode.connect.bind(gainNode),
-                start: (when = audioCtx.currentTime) => {
-                    source.start(when);
-                    gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
-                },
-                stop: (when = audioCtx.currentTime) => {
-                    source.stop(when + 0.1);
-                    gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
-                },
-            };
-        }
-		case 2:
-        {
-			source = audioCtx.createOscillator();
-			source.frequency.setValueAtTime(freq, 0);
-			const real = new Float32Array(6);
-			const imag = new Float32Array(6);
-
-			real[0] = 0;
-			imag[0] = 0;
-			real[1] = 0;
-			imag[1] = 131;
-			real[2] = 0;
-			imag[2] = 27;
-			real[3] = 0;
-			imag[3] = 37;
-			real[4] = 0;
-			imag[4] = 14;
-			real[5] = 0;
-			imag[5] = 10;
-
-            const fFn = fourier(imag.map(x=> x/131));
-            drawWave(fFn);
-
-			const wave = audioCtx.createPeriodicWave(real, imag);
-
-			source.setPeriodicWave(wave);
-
-            // const gainNode = audioCtx.createGain();
-            // gainNode.gain.setValueAtTime(0, 0);
-
-            // source.connect(gainNode);
-            // return {
-            //     connect: gainNode.connect.bind(gainNode),
-            //     start: (when = audioCtx.currentTime) => {
-            //         source.start(when);
-            //         gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
-            //     },
-            //     stop: (when = audioCtx.currentTime) => {
-            //         source.stop(when + 0.1);
-            //         gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
-            //     },
-            // };
-
-            const fadeNode = audioCtx.createGain();
-            fadeNode.gain.setValueAtTime(1, 0);
-
-            source.connect(fadeNode);
-
-            return {
-                connect: fadeNode.connect.bind(fadeNode),
-                start: (when = audioCtx.currentTime) => {
-                    source.start(when);
-                    fadeNode.gain.exponentialRampToValueAtTime(0.01, when + 1);
-                    source.stop(when + 1);
-                },
-                stop: () => {},
-            };
-        }
-		case 3:
-        {
-			var waveFn = fourier([0, 1, 0, 0.5]);
-            drawWave(waveFn);
-
-            const sampleCount = audioCtx.sampleRate / freq;
-            const wave = waveFn(sampleCount);
-
-			const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
-
-            // Get an AudioBufferSourceNode.
-            // This is the AudioNode to use when we want to play an AudioBuffer
-            source = audioCtx.createBufferSource();
-
-			// set the buffer in the AudioBufferSourceNode
-			source.buffer = myArrayBuffer;
-
-			source.loop = true;
-			source.loopLength = 1 / freq;
-
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0, 0);
-
-            source.connect(gainNode);
-            return {
-                connect: gainNode.connect.bind(gainNode),
-                start: (when = audioCtx.currentTime) => {
-                    source.start(when);
-                    gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
-                },
-                stop: (when = audioCtx.currentTime) => {
-                    source.stop(when + 0.1);
-                    gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
-                },
-            };
-        }
-		case 4:
-        {
-			var waveFn = fourier([0, 1, 0, 0.2, 0, 0.04, 0, 0.08]);
-            drawWave(waveFn);
-
-            const duration = 1;
-            const waveCount = Math.floor(duration * freq);
-            const actualDuration = waveCount / freq;
-            const sampleCount = actualDuration * audioCtx.sampleRate;
-            const wave = waveFn(sampleCount / waveCount);
-
-			const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
-
-			// Get an AudioBufferSourceNode.
-			// This is the AudioNode to use when we want to play an AudioBuffer
-			source = audioCtx.createBufferSource();
-
-			// set the buffer in the AudioBufferSourceNode
-			source.buffer = myArrayBuffer;
-
-            const fadeNode = audioCtx.createGain();
-            fadeNode.gain.setValueAtTime(1, 0);
-
-            source.connect(fadeNode);
-
-            return {
-                connect: fadeNode.connect.bind(fadeNode),
-                start: (when = audioCtx.currentTime) => {
-                    source.start(when);
-                    fadeNode.gain.linearRampToValueAtTime(0.01, when + 1);
-                    source.stop(when + 1);
-                },
-                stop: () => {},
-            };
-        }
-		case 5:
-        {
-            const duration = 1;
-            const sampleCount = duration * audioCtx.sampleRate;
-            const samplesPerCycle = Math.floor(audioCtx.sampleRate / freq);
-
-            const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
-
-            var myArrayBuffer = audioCtx.createBuffer(2, sampleCount, audioCtx.sampleRate);
-
-            for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
-            // This gives us the actual array that contains the data
-                var nowBuffering = myArrayBuffer.getChannelData(channel);
-                for (var i = 0; i < myArrayBuffer.length; i++) {
-                    const sampleNo = (i%samplesPerCycle);
-                    const frac = (sampleNo / samplesPerCycle) * values.length;
-                    const idx = Math.floor(frac);
-                    const delta = frac - idx;
-                    const next = idx < values.length - 1 ? values[idx+1] : values[0];
-                    nowBuffering[i] = (1-delta) * values[idx] + delta * next;
-                }
+                return document.getElementById("impact-input").checked ?
+                    impactNote(audioCtx, source, gain) :
+                    rampOnOff(audioCtx, source, gain);
             }
+        case 1: // Square
+            return function (freq, gain) {
+                const source = audioCtx.createOscillator();
+                source.frequency.setValueAtTime(freq, 0);
+                source.type = "square";
 
-			// Get an AudioBufferSourceNode.
-			// This is the AudioNode to use when we want to play an AudioBuffer
-			source = audioCtx.createBufferSource();
+                return document.getElementById("impact-input").checked ?
+                    impactNote(audioCtx, source, gain) :
+                    rampOnOff(audioCtx, source, gain);
+            }
+        case 2: // Sawtooth
+            return function (freq, gain) {
+                const source = audioCtx.createOscillator();
+                source.frequency.setValueAtTime(freq, 0);
+                source.type = "sawtooth";
 
-			// set the buffer in the AudioBufferSourceNode
-			source.buffer = myArrayBuffer;
+                return document.getElementById("impact-input").checked ?
+                    impactNote(audioCtx, source, gain) :
+                    rampOnOff(audioCtx, source, gain);
+            }
+        case 3: // Periodic
+            return function (freq, gain) {
+                const source = audioCtx.createOscillator();
+                source.frequency.setValueAtTime(freq, 0);
+                const real = new Float32Array(6);
+                const imag = new Float32Array(6);
 
-            const fadeNode = audioCtx.createGain();
-            fadeNode.gain.setValueAtTime(1, 0);
+                real[0] = 0;
+                imag[0] = 0;
+                real[1] = 0;
+                imag[1] = 131;
+                real[2] = 0;
+                imag[2] = 27;
+                real[3] = 0;
+                imag[3] = 37;
+                real[4] = 0;
+                imag[4] = 14;
+                real[5] = 0;
+                imag[5] = 10;
 
-            source.connect(fadeNode);
+                const fFn = fourier(imag.map(x=> x/131));
+                drawWave(fFn);
 
-            return {
-                connect: fadeNode.connect.bind(fadeNode),
-                start: (when = audioCtx.currentTime) => {
-                    source.start(when);
-                    fadeNode.gain.linearRampToValueAtTime(0.01, when + 1);
-                    source.stop(when + 1);
-                },
-                stop: () => {},
-            };
-        }
-		case 6:
-        {
-			source = audioCtx.createOscillator();
-			source.frequency.setValueAtTime(freq, 0);
+                const wave = audioCtx.createPeriodicWave(real, imag);
 
-			const wave = audioCtx.createPeriodicWave(Xk_re, Xk_im);
+                source.setPeriodicWave(wave);
 
-			source.setPeriodicWave(wave);
+                return document.getElementById("impact-input").checked ?
+                    impactNote(audioCtx, source, gain) :
+                    rampOnOff(audioCtx, source, gain);
+            }
+		case 4: // Organ
+            return function (freq, gain) {
+                var waveFn = fourier([0, 1, 0, 0.5]);
+                drawWave(waveFn);
 
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0, 0);
+                const sampleCount = audioCtx.sampleRate / freq;
+                const wave = waveFn(sampleCount);
 
-            source.connect(gainNode);
-            return {
-                connect: gainNode.connect.bind(gainNode),
-                start: (when = audioCtx.currentTime) => {
-                    source.start(when);
-                    gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
-                },
-                stop: (when = audioCtx.currentTime) => {
-                    source.stop(when + 0.1);
-                    gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
-                },
-            };
-        }
+                const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
+
+                // Get an AudioBufferSourceNode.
+                // This is the AudioNode to use when we want to play an AudioBuffer
+                const source = audioCtx.createBufferSource();
+
+                // set the buffer in the AudioBufferSourceNode
+                source.buffer = myArrayBuffer;
+
+                source.loop = true;
+                source.loopLength = 1 / freq;
+
+                return document.getElementById("impact-input").checked ?
+                    impactNote(audioCtx, source, gain) :
+                    rampOnOff(audioCtx, source, gain);
+            }
+		case 5: // Piano
+            return function (freq, gain) {
+                var waveFn = fourier([0, 1, 0, 0.2, 0, 0.04, 0, 0.08]);
+                drawWave(waveFn);
+
+                const duration = 1;
+                const waveCount = Math.floor(duration * freq);
+                const actualDuration = waveCount / freq;
+                const sampleCount = actualDuration * audioCtx.sampleRate;
+                const wave = waveFn(sampleCount / waveCount);
+
+                const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
+
+                // Get an AudioBufferSourceNode.
+                // This is the AudioNode to use when we want to play an AudioBuffer
+                const source = audioCtx.createBufferSource();
+
+                // set the buffer in the AudioBufferSourceNode
+                source.buffer = myArrayBuffer;
+
+                return document.getElementById("impact-input").checked ?
+                    impactNote(audioCtx, source, gain) :
+                    rampOnOff(audioCtx, source, gain);
+            }
+		case 6: // Fourier In
+            return function (freq, gain) {
+                const duration = 1;
+                const sampleCount = duration * audioCtx.sampleRate;
+                const samplesPerCycle = Math.floor(audioCtx.sampleRate / freq);
+
+                const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
+
+                var myArrayBuffer = audioCtx.createBuffer(2, sampleCount, audioCtx.sampleRate);
+
+                for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
+                // This gives us the actual array that contains the data
+                    var nowBuffering = myArrayBuffer.getChannelData(channel);
+                    for (var i = 0; i < myArrayBuffer.length; i++) {
+                        const sampleNo = (i%samplesPerCycle);
+                        const frac = (sampleNo / samplesPerCycle) * values.length;
+                        const idx = Math.floor(frac);
+                        const delta = frac - idx;
+                        const next = idx < values.length - 1 ? values[idx+1] : values[0];
+                        nowBuffering[i] = (1-delta) * values[idx] + delta * next;
+                    }
+                }
+
+                // Get an AudioBufferSourceNode.
+                // This is the AudioNode to use when we want to play an AudioBuffer
+                const source = audioCtx.createBufferSource();
+
+                // set the buffer in the AudioBufferSourceNode
+                source.buffer = myArrayBuffer;
+
+                return document.getElementById("impact-input").checked ?
+                    impactNote(audioCtx, source, gain) :
+                    rampOnOff(audioCtx, source, gain);
+            }
+		case 7: // Fourier Out
+            return function (freq, gain) {
+                const source = audioCtx.createOscillator();
+                source.frequency.setValueAtTime(freq, 0);
+
+                const wave = audioCtx.createPeriodicWave(Xk_re, Xk_im);
+
+                source.setPeriodicWave(wave);
+
+                return document.getElementById("impact-input").checked ?
+                    impactNote(audioCtx, source, gain) :
+                    rampOnOff(audioCtx, source, gain);
+            }
         default:
             throw Error("No program (instrument) selected");
-	}
+    }
+}
+
+/**
+ * @param {AudioContext} audioCtx
+ * @param {AudioScheduledSourceNode} source
+ * @param {number} gain
+ * @return {AudioScheduledSourceNode}
+ */
+function rampOnOff (audioCtx, source, gain) {
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.setValueAtTime(0, 0);
+
+    source.connect(gainNode);
+    return {
+        connect: gainNode.connect.bind(gainNode),
+        start: (when = audioCtx.currentTime) => {
+            source.start(when);
+            gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
+        },
+        stop: (when = audioCtx.currentTime) => {
+            source.stop(when + 0.1);
+            gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
+        },
+    };
+}
+
+/**
+ * @param {AudioContext} audioCtx
+ * @param {AudioScheduledSourceNode} source
+ * @param {number} gain
+ * @param {number} duration
+ * @return {AudioScheduledSourceNode}
+ */
+function impactNote (audioCtx, source, gain, duration = 1) {
+
+    const fadeNode = audioCtx.createGain();
+    fadeNode.gain.setValueAtTime(gain, 0);
+
+    source.connect(fadeNode);
+
+    return {
+        connect: fadeNode.connect.bind(fadeNode),
+        start: (when = audioCtx.currentTime) => {
+            source.start(when);
+            fadeNode.gain.exponentialRampToValueAtTime(0.01, when + duration);
+            source.stop(when + duration);
+        },
+        stop: () => {},
+    };
+}
+
+
+function createNote (audioCtx, freq, gain, program) {
+    return getInstrument(audioCtx, program)(freq, gain);
 }
 
 function fourier (coef) {
