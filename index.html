@@ -170,169 +170,141 @@ document.getElementById('play-btn').addEventListener('click', function () {
 
 });
 
-function getInstrument (audioCtx, program) {
-    switch (program) {
-		case 0: // Sine
-            return function (freq, gain) {
-                const source = audioCtx.createOscillator();
-                source.frequency.setValueAtTime(freq, 0);
-                source.type = "sine";
+const instruments = {
+    sine (freq) {
+        const source = audioCtx.createOscillator();
+        source.frequency.setValueAtTime(freq, 0);
+        source.type = "sine";
 
-                drawWave(fourier([0,1]));
+        drawWave(fourier([0,1]));
 
-                return document.getElementById("impact-input").checked ?
-                    impactNote(audioCtx, source, gain) :
-                    rampOnOff(audioCtx, source, gain);
+        return source;
+    },
+    square (freq) {
+        const source = audioCtx.createOscillator();
+        source.frequency.setValueAtTime(freq, 0);
+        source.type = "square";
+
+        return source;
+    },
+    sawtooth (freq) {
+        const source = audioCtx.createOscillator();
+        source.frequency.setValueAtTime(freq, 0);
+        source.type = "sawtooth";
+
+        return source;
+    },
+    periodic (freq) {
+        const source = audioCtx.createOscillator();
+        source.frequency.setValueAtTime(freq, 0);
+        const real = new Float32Array(6);
+        const imag = new Float32Array(6);
+
+        real[0] = 0;
+        imag[0] = 0;
+        real[1] = 0;
+        imag[1] = 131;
+        real[2] = 0;
+        imag[2] = 27;
+        real[3] = 0;
+        imag[3] = 37;
+        real[4] = 0;
+        imag[4] = 14;
+        real[5] = 0;
+        imag[5] = 10;
+
+        const fFn = fourier(imag.map(x=> x/131));
+        drawWave(fFn);
+
+        const wave = audioCtx.createPeriodicWave(real, imag);
+
+        source.setPeriodicWave(wave);
+
+        return source;
+    },
+    piano (freq) {
+        var waveFn = fourier([0, 1, 0, 0.5]);
+        drawWave(waveFn);
+
+        const sampleCount = audioCtx.sampleRate / freq;
+        const wave = waveFn(sampleCount);
+
+        const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
+
+        // Get an AudioBufferSourceNode.
+        // This is the AudioNode to use when we want to play an AudioBuffer
+        const source = audioCtx.createBufferSource();
+
+        // set the buffer in the AudioBufferSourceNode
+        source.buffer = myArrayBuffer;
+
+        source.loop = true;
+        source.loopLength = 1 / freq;
+
+        return source;
+    },
+    organ (freq) {
+        var waveFn = fourier([0, 1, 0, 0.2, 0, 0.04, 0, 0.08]);
+        drawWave(waveFn);
+
+        const sampleCount = audioCtx.sampleRate / freq;
+        const wave = waveFn(sampleCount);
+
+        const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
+
+        // Get an AudioBufferSourceNode.
+        // This is the AudioNode to use when we want to play an AudioBuffer
+        const source = audioCtx.createBufferSource();
+
+        // set the buffer in the AudioBufferSourceNode
+        source.buffer = myArrayBuffer;
+
+        source.loop = true;
+        source.loopLength = 1 / freq;
+
+        return source;
+    },
+    fourierIn (freq) {
+        const duration = 1;
+        const sampleCount = duration * audioCtx.sampleRate;
+        const samplesPerCycle = Math.floor(audioCtx.sampleRate / freq);
+
+        const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
+
+        var myArrayBuffer = audioCtx.createBuffer(2, sampleCount, audioCtx.sampleRate);
+
+        for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
+        // This gives us the actual array that contains the data
+            var nowBuffering = myArrayBuffer.getChannelData(channel);
+            for (var i = 0; i < myArrayBuffer.length; i++) {
+                const sampleNo = (i%samplesPerCycle);
+                const frac = (sampleNo / samplesPerCycle) * values.length;
+                const idx = Math.floor(frac);
+                const delta = frac - idx;
+                const next = idx < values.length - 1 ? values[idx+1] : values[0];
+                nowBuffering[i] = (1-delta) * values[idx] + delta * next;
             }
-        case 1: // Square
-            return function (freq, gain) {
-                const source = audioCtx.createOscillator();
-                source.frequency.setValueAtTime(freq, 0);
-                source.type = "square";
+        }
 
-                return document.getElementById("impact-input").checked ?
-                    impactNote(audioCtx, source, gain) :
-                    rampOnOff(audioCtx, source, gain);
-            }
-        case 2: // Sawtooth
-            return function (freq, gain) {
-                const source = audioCtx.createOscillator();
-                source.frequency.setValueAtTime(freq, 0);
-                source.type = "sawtooth";
+        // Get an AudioBufferSourceNode.
+        // This is the AudioNode to use when we want to play an AudioBuffer
+        const source = audioCtx.createBufferSource();
 
-                return document.getElementById("impact-input").checked ?
-                    impactNote(audioCtx, source, gain) :
-                    rampOnOff(audioCtx, source, gain);
-            }
-        case 3: // Periodic
-            return function (freq, gain) {
-                const source = audioCtx.createOscillator();
-                source.frequency.setValueAtTime(freq, 0);
-                const real = new Float32Array(6);
-                const imag = new Float32Array(6);
+        // set the buffer in the AudioBufferSourceNode
+        source.buffer = myArrayBuffer;
 
-                real[0] = 0;
-                imag[0] = 0;
-                real[1] = 0;
-                imag[1] = 131;
-                real[2] = 0;
-                imag[2] = 27;
-                real[3] = 0;
-                imag[3] = 37;
-                real[4] = 0;
-                imag[4] = 14;
-                real[5] = 0;
-                imag[5] = 10;
+        return source;
+    },
+    fourierOut (freq) {
+        const source = audioCtx.createOscillator();
+        source.frequency.setValueAtTime(freq, 0);
 
-                const fFn = fourier(imag.map(x=> x/131));
-                drawWave(fFn);
+        const wave = audioCtx.createPeriodicWave(Xk_re, Xk_im);
 
-                const wave = audioCtx.createPeriodicWave(real, imag);
+        source.setPeriodicWave(wave);
 
-                source.setPeriodicWave(wave);
-
-                return document.getElementById("impact-input").checked ?
-                    impactNote(audioCtx, source, gain) :
-                    rampOnOff(audioCtx, source, gain);
-            }
-		case 4: // Organ
-            return function (freq, gain) {
-                var waveFn = fourier([0, 1, 0, 0.5]);
-                drawWave(waveFn);
-
-                const sampleCount = audioCtx.sampleRate / freq;
-                const wave = waveFn(sampleCount);
-
-                const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
-
-                // Get an AudioBufferSourceNode.
-                // This is the AudioNode to use when we want to play an AudioBuffer
-                const source = audioCtx.createBufferSource();
-
-                // set the buffer in the AudioBufferSourceNode
-                source.buffer = myArrayBuffer;
-
-                source.loop = true;
-                source.loopLength = 1 / freq;
-
-                return document.getElementById("impact-input").checked ?
-                    impactNote(audioCtx, source, gain) :
-                    rampOnOff(audioCtx, source, gain);
-            }
-		case 5: // Piano
-            return function (freq, gain) {
-                var waveFn = fourier([0, 1, 0, 0.2, 0, 0.04, 0, 0.08]);
-                drawWave(waveFn);
-
-                const sampleCount = audioCtx.sampleRate / freq;
-                const wave = waveFn(sampleCount);
-
-                const myArrayBuffer = generateArrayBuffer(audioCtx, wave, sampleCount);
-
-                // Get an AudioBufferSourceNode.
-                // This is the AudioNode to use when we want to play an AudioBuffer
-                const source = audioCtx.createBufferSource();
-
-                // set the buffer in the AudioBufferSourceNode
-                source.buffer = myArrayBuffer;
-
-                source.loop = true;
-                source.loopLength = 1 / freq;
-
-                return document.getElementById("impact-input").checked ?
-                    impactNote(audioCtx, source, gain) :
-                    rampOnOff(audioCtx, source, gain);
-            }
-		case 6: // Fourier In
-            return function (freq, gain) {
-                const duration = 1;
-                const sampleCount = duration * audioCtx.sampleRate;
-                const samplesPerCycle = Math.floor(audioCtx.sampleRate / freq);
-
-                const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
-
-                var myArrayBuffer = audioCtx.createBuffer(2, sampleCount, audioCtx.sampleRate);
-
-                for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
-                // This gives us the actual array that contains the data
-                    var nowBuffering = myArrayBuffer.getChannelData(channel);
-                    for (var i = 0; i < myArrayBuffer.length; i++) {
-                        const sampleNo = (i%samplesPerCycle);
-                        const frac = (sampleNo / samplesPerCycle) * values.length;
-                        const idx = Math.floor(frac);
-                        const delta = frac - idx;
-                        const next = idx < values.length - 1 ? values[idx+1] : values[0];
-                        nowBuffering[i] = (1-delta) * values[idx] + delta * next;
-                    }
-                }
-
-                // Get an AudioBufferSourceNode.
-                // This is the AudioNode to use when we want to play an AudioBuffer
-                const source = audioCtx.createBufferSource();
-
-                // set the buffer in the AudioBufferSourceNode
-                source.buffer = myArrayBuffer;
-
-                return document.getElementById("impact-input").checked ?
-                    impactNote(audioCtx, source, gain) :
-                    rampOnOff(audioCtx, source, gain);
-            }
-		case 7: // Fourier Out
-            return function (freq, gain) {
-                const source = audioCtx.createOscillator();
-                source.frequency.setValueAtTime(freq, 0);
-
-                const wave = audioCtx.createPeriodicWave(Xk_re, Xk_im);
-
-                source.setPeriodicWave(wave);
-
-                return document.getElementById("impact-input").checked ?
-                    impactNote(audioCtx, source, gain) :
-                    rampOnOff(audioCtx, source, gain);
-            }
-        default:
-            throw Error("No program (instrument) selected");
-    }
+        return source;
+    },
 }
 
 /**
@@ -384,9 +356,40 @@ function impactNote (audioCtx, source, gain, duration = 1) {
     };
 }
 
-
 function createNote (audioCtx, freq, gain, program) {
-    return getInstrument(audioCtx, program)(freq, gain);
+    let source;
+    switch (program % 8) {
+		case 0: // Sine
+            source = instruments.sine(freq);
+            break;
+        case 1: // Square
+            source = instruments.square(freq);
+            break;
+        case 2: // Sawtooth
+            source = instruments.sawtooth(freq);
+            break;
+        case 3: // Periodic
+            source = instruments.periodic(freq);
+            break;
+		case 4: // Organ
+            source = instruments.organ(freq);
+            break;
+		case 5: // Piano
+            source = instruments.piano(freq);
+            break;
+		case 6: // Fourier In
+            source = instruments.fourierIn(freq);
+            break;
+		case 7: // Fourier Out
+            source = instruments.fourierOut(freq);
+            break;
+        default:
+            throw Error("No program (instrument) selected");
+    }
+
+    return document.getElementById("impact-input").checked ?
+            impactNote(audioCtx, source, gain) :
+            rampOnOff(audioCtx, source, gain);
 }
 
 function fourier (coef) {
