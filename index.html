@@ -6,17 +6,17 @@
 <div id="keys"></div>
 <br>
 <input type="range" min="0" max="1" step="0.05" value="0.25" id="volume-input" />
-<select id="instrument-input">
-    <option value="0">Sine</option>
-    <option value="1">Square</option>
-    <option value="2">Sawtooth</option>
-    <option value="3">Periodic</option>
-    <option value="4">Organ</option>
-    <option value="5">Piano</option>
-    <option value="6">Fourier In</option>
-    <option value="7">Fourier Out</option>
-</select>
-<label>Impact <input type="checkbox" id="impact-input" /></label>
+<input type="number" id="instrument-input" min="0" max="15" value="0" />
+<ol start="0">
+    <li value="0">Sine</li>
+    <li value="1">Square</li>
+    <li value="2">Sawtooth</li>
+    <li value="3">Periodic</li>
+    <li value="4">Organ</li>
+    <li value="5">Piano</li>
+    <li value="6">Fourier In</li>
+    <li value="7">Fourier Out</li>
+</ol>
 <br/>
 <input type="file" id="file-input" />
 <button id="play-btn">Play MIDI</button>
@@ -178,14 +178,25 @@ const synth = {
 const keyMap = '`1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./';
 
 document.addEventListener('keydown', function (e) {
-    const index = e.key === "#" ? 25 : keyMap.indexOf(e.key);
+    if (e.key === "ArrowUp") {
+        const instrument = document.getElementById('instrument-input');
+        instrument.value = parseInt(instrument.value, 10) + 1;
+        e.preventDefault();
+    } else if (e.key === "ArrowDown") {
+        const instrument = document.getElementById('instrument-input');
+        instrument.value = parseInt(instrument.value, 10) - 1;
+        e.preventDefault();
+    }
+    else {
+        const index = e.key === "#" ? 25 : keyMap.indexOf(e.key);
 
-    if (index < 0) {
-        return;
-    };
+        if (index < 0) {
+            return;
+        };
 
-    e.preventDefault();
-    synth.noteOn(index + 23);
+        e.preventDefault();
+        synth.noteOn(index + 23);
+    }
 });
 
 document.addEventListener('keyup', function (e) {
@@ -472,7 +483,7 @@ function createNote (audioCtx, freq, gain, program) {
             throw Error("No program (instrument) selected");
     }
 
-    return document.getElementById("impact-input").checked ?
+    return program > 7 ?
             impactNote(audioCtx, source, gain) :
             rampOnOff(audioCtx, source, gain);
 }
