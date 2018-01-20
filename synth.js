@@ -66,6 +66,11 @@ const synth = {
         return alpha + sharp + octave;
     },
 
+    /** @static */
+    isSharp (num) {
+        return sharps[num % 12];
+    },
+
     addAnalyser (fn) {
       if (!audioCtx) {
         initCtx();

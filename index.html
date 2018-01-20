@@ -2,6 +2,32 @@
 <head>
 <meta charset="utf-8" />
 <title>AudioPlay</title>
+<style>
+#keys {
+    overflow-x: auto;
+    white-space: nowrap;
+    position: relative;
+}
+.key {
+    height: 100px;
+    width: 25px;
+    background-color: white;
+    border: 1px solid #999;
+    border-radius: 3px;
+    font-size: small;
+    padding: 0;
+}
+.key.sharp {
+    background-color: black;
+    color: white;
+    height: 33px;
+    position: absolute;
+    margin-left: -12.5px;
+}
+#fourier-coef {
+    overflow: hidden;
+}
+</style>
 </head>
 <body>
 <div id="keys"></div>
@@ -39,6 +65,7 @@ for (let i = 0; i < 96; i++) {
     const btn = document.createElement('button');
     const num = i;
     btn.innerText = synth.getNoteName(num);
+    btn.className = synth.isSharp(num) ? "key sharp" : "key";
     btn.addEventListener('mousedown', function (e){
         const select = document.getElementById('instrument-input');
         const program = parseInt(select.value, 10)
@@ -51,10 +78,6 @@ for (let i = 0; i < 96; i++) {
         synth.noteOff(num);
     });
     keysDiv.appendChild(btn);
-
-    if(num % 12 == 11) {
-        keysDiv.appendChild(document.createElement('br'));
-    }
 }
 
 document.getElementById('volume-input').addEventListener('change', function (e) {
