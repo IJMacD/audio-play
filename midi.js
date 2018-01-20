@@ -1,6 +1,5 @@
 class MidiNode {
-	constructor (audioContext, synth) {
-		this.audioContext = audioContext;
+	constructor (synth) {
 		this.synth = synth;
 	}
 
@@ -13,7 +12,7 @@ class MidiNode {
 	}
 
 	start (when = 0) {
-		when = Math.max(when, this.audioContext.currentTime);
+		when = Math.max(when, this.synth.currentTime);
 
 		const midi = parseMidi(this.buffer);
 		console.log(midi);
@@ -24,6 +23,8 @@ class MidiNode {
 
 			const tempo = track.tempo || 500000;	// Microseconds per quarter note (500000 = 120 bpm)
 
+			const program = 11;
+
 			track.events.forEach(evt => {
 				nextTime += evt.deltaTime * ((tempo / midi.division) * 1e-6);
 
@@ -31,7 +32,7 @@ class MidiNode {
 					this.synth.noteOff(evt.key - 17, nextTime, evt.velocity / 127);
 				}
 				else if (evt.type === 0x90) {
-					this.synth.noteOn(evt.key - 17, nextTime, evt.velocity / 127);
+					this.synth.noteOn(program, evt.key - 17, nextTime, evt.velocity / 127);
 				}
 			});
 		})
