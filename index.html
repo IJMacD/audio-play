@@ -47,6 +47,7 @@
 <br/>
 <input type="file" id="file-input" />
 <button id="play-btn">Play MIDI</button>
+<div id="debug-output"></div>
 <canvas id="scope-canvas" width="256" style="display: block; border: 1px solid black;"></canvas>
 <canvas id="freq-canvas" width="256" style="display: block; border: 1px solid black;"></canvas>
 <canvas id="wave-canvas" width="200" style="display: block; border: 1px solid black;"></canvas>
@@ -56,9 +57,12 @@
 <canvas id="fourier-out" width="200" style="display: block; border: 1px solid black;"></canvas>
 <script src="midi.js"></script>
 <script src="synth.js"></script>
+<script src="general-midi.js"></script>
 <script src="sample.mid.js"></script>
 <script>
 "use strict";
+
+let synthTracks;
 
 const keysDiv = document.getElementById('keys');
 for (let i = 0; i < 96; i++) {
@@ -80,8 +84,21 @@ for (let i = 0; i < 96; i++) {
     keysDiv.appendChild(btn);
 }
 
-document.getElementById('volume-input').addEventListener('change', function (e) {
-	synth.setVolume(e.target.value, synth.currentTime + 1);
+const initialVolume = localStorage.getItem("volume") || 0.25;
+const volumeInput = document.getElementById('volume-input');
+volumeInput.value = initialVolume;
+synth.setVolume(initialVolume);
+volumeInput.addEventListener('change', function (e) {
+    synth.setVolume(e.target.value, synth.currentTime + 1);
+    localStorage.setItem("volume", e.target.value)
+});
+
+
+const initialInstrument = localStorage.getItem("instrument") || 0;
+const instrumentInput = document.getElementById('instrument-input');
+instrumentInput.value = initialInstrument;
+instrumentInput.addEventListener('change', function (e) {
+	localStorage.setItem("instrument", e.target.value);
 });
 
 synth.addAnalyser(function (analyser) {
@@ -136,7 +153,7 @@ synth.addAnalyser(function (analyser) {
         }
         fCtx.stroke();
     }
-})
+});
 
 const keyMap = '`1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./';
 const dvorakMap = '1234567890[]\',.pyfgcrl/=aoeuidhtns-\\\\;qjkxbmwvz';
@@ -145,10 +162,12 @@ document.addEventListener('keydown', function (e) {
     if (e.key === "ArrowUp") {
         const instrument = document.getElementById('instrument-input');
         instrument.value = parseInt(instrument.value, 10) + 1;
+        localStorage.setItem("instrument", instrument.value);
         e.preventDefault();
     } else if (e.key === "ArrowDown") {
         const instrument = document.getElementById('instrument-input');
-        instrument.value = parseInt(instrument.value, 10) - 1;
+        instrument.value = parseInt(instrument.value, 10) - 1
+        localStorage.setItem("instrument", instrument.value);
         e.preventDefault();
     }
     else if(e.target.type !== "text" && e.target.type !== "number") {
@@ -177,6 +196,21 @@ document.addEventListener('keyup', function (e) {
     synth.noteOff(index + 23);
 });
 
+document.getElementById('file-input').addEventListener("change", function (e) {
+    if (e.target.files && e.target.files[0]) {
+		var reader = new FileReader();
+
+		reader.onload = function(e2) {
+            const midi = parseMidi(e2.target.result);
+            console.log(midi);
+            debugMidi(midi);
+		}
+
+		reader.readAsArrayBuffer(e.target.files[0]);
+	}
+    const midi = parseMidi;
+});
+
 document.getElementById('play-btn').addEventListener('click', function () {
 
 	const fileInput = document.getElementById('file-input');
@@ -185,21 +219,29 @@ document.getElementById('play-btn').addEventListener('click', function () {
 
 		reader.onload = function(e) {
 			const midiNode = new MidiNode(synth);
-			midiNode.connect(gainNode);
+			// midiNode.connect(gainNode);
 			midiNode.openFile(e.target.result);
-			midiNode.start();
+            synthTracks = midiNode.start();
 		}
 
 		reader.readAsArrayBuffer(fileInput.files[0]);
 	}
 	else {
 		const midiNode = new MidiNode(synth);
-		midiNode.connect(gainNode);
+		// midiNode.connect(gainNode);
 		midiNode.openFile(sample);
-		midiNode.start();
+		synthTracks = midiNode.start();
 	}
 
 });
+
+function toggleTrack (e) {
+    const index = e.target.dataset.index;
+    const enabled = e.target.checked;
+    if (synthTracks && synthTracks[index]) {
+        synthTracks[index].setVolume(enabled ? 1 : 0);
+    }
+}
 
 function drawWave (waveFn) {
     const canvas = document.getElementById('wave-canvas');
@@ -297,6 +339,25 @@ function doFourier () {
         ctx2.lineTo(i, (-value + 1) * canvas2.height / 2);
     }
     ctx2.stroke();
+}
+
+function debugMidi (midi) {
+    const debugOutput = document.getElementById("debug-output");
+    debugOutput.innerHTML = "<ul>" + midi.tracks.map((t,i) => "<li>" + debugMidiTrack(t, i) + "</li>").join("") + "</ul>";
+}
+
+function debugMidiTrack (track, index) {
+    return "<p>" +
+        '<input type="checkbox" data-index="' + index + '" onChange="toggleTrack(event)" checked />' +
+        (track.name||"&lt;no name>") +
+        "<ul>" +
+            Object.entries(track.channels).map(([k,v]) => "<li>" + debugMidiChannel(k, v) + "</li>").join("") +
+        "</ul>" +
+    "</p>";
+}
+
+function debugMidiChannel (channel, data) {
+    return "Channel " + (parseInt(channel, 10) + 1) + ": " + (channel !== "9" && typeof data.program !== "undefined" ? GM_PROGRAMS[data.program] : "");
 }
 </script>
 </body>

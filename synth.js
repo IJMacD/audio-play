@@ -7,54 +7,104 @@ const noteRatio = Math.exp(Math.LN2 / 12);
 
 const noteMap = {};
 
-let audioCtx, gainNode;
+let audioCtx;
 
 function getNoteFreq (num) {
     return concertPitch * Math.pow(noteRatio, num - concertPitchNum);
 }
 
-function initCtx () {
-	audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-	gainNode = audioCtx.createGain();
+function noteOn (program, num, when, gain=1) {
 
-	gainNode.gain.setValueAtTime(0.25, 0);
+    if (!audioCtx) {
+        this.initCtx();
+    }
+
+    if (!noteMap[num]) {
+
+        const freq = getNoteFreq(num);
+        const source = createNote(audioCtx, freq, gain, program);
+
+        // connect the AudioBufferSourceNode to the
+        // destination so we can hear the sound
+        source.connect(this.destination);
+
+        // start the source playing
+        source.start(when);
+
+        noteMap[num] = source;
+    }
+}
+
+function noteOff (num, when) {
+
+    if (noteMap[num]) {
+        noteMap[num].stop(when);
+        noteMap[num] = null;
+    }
+}
+
+function setVolume (value, when) {
+    if (this.destination) {
+        if (typeof when === "undefined") {
+            when = audioCtx.currentTime;
+        }
+        this.destination.gain.linearRampToValueAtTime(value, when);
+    }
+}
+
+function addAnalyser (fn) {
+
+    if (!audioCtx) {
+        this.initCtx();
+    }
+
+    const analyser = audioCtx.createAnalyser();
+
+    this.destination.connect(analyser);
+    analyser.connect(this.nextDestination);
+
+    fn(analyser);
 }
 
 const synth = {
-    noteOn (program, num, when, gain=1) {
+    initCtx () {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        this.destination = audioCtx.createGain();
+
+        this.destination.gain.setValueAtTime(0.25, 0);
+
+        // Save next destination so an analyser node can insert itself
+        this.nextDestination = audioCtx.destination;
+        this.destination.connect(this.nextDestination);
+    },
+
+    noteOn,
+
+    noteOff,
+
+    setVolume,
+
+    addAnalyser,
+
+    /** @static */
+    createTrack(id) {
 
         if (!audioCtx) {
-            initCtx();
+            this.initCtx();
         }
 
-        if (!noteMap[num]) {
+        const trackGain = audioCtx.createGain();
 
-            const freq = getNoteFreq(num);
-            const source = createNote(audioCtx, freq, gain, program);
+        trackGain.connect(this.destination);
 
-            // connect the AudioBufferSourceNode to the
-            // destination so we can hear the sound
-            source.connect(gainNode);
-
-            // start the source playing
-            source.start(when);
-
-            noteMap[num] = source;
-        }
-    },
-
-    noteOff (num, when) {
-
-        if (noteMap[num]) {
-            noteMap[num].stop(when);
-            noteMap[num] = null;
-        }
-    },
-
-    setVolume (value, when) {
-      if (gainNode) {
-        gainNode.gain.linearRampToValueAtTime(value, when);
-      }
+        return {
+            destination: trackGain,
+            nextDestination: this.destination,
+            noteOn,
+            noteOff,
+            setVolume,
+            addAnalyser,
+        };
     },
 
     /** @static */
@@ -70,19 +120,6 @@ const synth = {
     isSharp (num) {
         return sharps[num % 12];
     },
-
-    addAnalyser (fn) {
-      if (!audioCtx) {
-        initCtx();
-      }
-
-      const analyser = audioCtx.createAnalyser();
-
-      gainNode.connect(analyser);
-      analyser.connect(audioCtx.destination);
-
-      fn(analyser);
-    }
 };
 
 Object.defineProperty(synth, "currentTime", { get: () => audioCtx.currentTime });
@@ -177,7 +214,6 @@ const instruments = {
       source.buffer = myArrayBuffer;
 
       source.loop = true;
-      source.loopLength = 1 / freq;
 
       return source;
   },
@@ -198,7 +234,6 @@ const instruments = {
       source.buffer = myArrayBuffer;
 
       source.loop = true;
-      source.loopLength = 1 / freq;
 
       return source;
   },
@@ -236,7 +271,6 @@ const instruments = {
       source.buffer = myArrayBuffer;
 
       source.loop = true;
-      source.loopLength = 1 / freq;
 
       return source;
   },

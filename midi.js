@@ -15,9 +15,10 @@ class MidiNode {
 		when = Math.max(when, this.synth.currentTime);
 
 		const midi = parseMidi(this.buffer);
-		console.log(midi);
 
-		midi.tracks.forEach(track => {
+		const synthTracks = [];
+
+		midi.tracks.forEach((track,i) => {
 
 			let nextTime = when;
 
@@ -25,17 +26,23 @@ class MidiNode {
 
 			const program = 11;
 
+			const synthTrack = this.synth.createTrack();
+
+			synthTracks.push(synthTrack);
+
 			track.events.forEach(evt => {
 				nextTime += evt.deltaTime * ((tempo / midi.division) * 1e-6);
 
 				if (evt.type === 0x80) {
-					this.synth.noteOff(evt.key - 17, nextTime, evt.velocity / 127);
+					synthTrack.noteOff(evt.key - 17, nextTime, evt.velocity / 127);
 				}
 				else if (evt.type === 0x90) {
-					this.synth.noteOn(program, evt.key - 17, nextTime, evt.velocity / 127);
+					synthTrack.noteOn(program, evt.key - 17, nextTime, evt.velocity / 127);
 				}
 			});
-		})
+		});
+
+		return synthTracks;
 	}
 }
 
@@ -94,7 +101,7 @@ function parseMidi (buffer) {
 			continue;
 		}
 
-		const track = { events: [] };
+		const track = { events: [], channels: {} };
 		let meta = track;
 
 		let prevStatus;
@@ -110,6 +117,7 @@ function parseMidi (buffer) {
 			let status = view.getUint8(index++);
 
 			if (status < 0x80) {
+				// Continuation Data
 				status = prevStatus;
 				index--;
 			}
@@ -121,29 +129,60 @@ function parseMidi (buffer) {
 			const eventRes = parseEvent(view, index, status);
 
 			if (eventRes.event) {
-				if (eventRes.event.type === 0xFF &&
-					eventRes.event.metaType === 0x2F)
+				const { event }  = eventRes;
+				if (event.type === 0xFF &&
+					event.metaType === 0x2F)
 				{
 					// 0x2F: End of Track Meta Event
 					track.length = currTime;
 				}
 				else {
-					eventRes.event.deltaTime = deltaTime;
-					track.events.push(eventRes.event);
+					event.deltaTime = deltaTime;
+					track.events.push(event);
+
+					const { channel } = event;
+					if (!track.channels[channel]) {
+						track.channels[channel] = { };
+					}
+
+					if(typeof event.controller !== "undefined") {
+						const { controller, value } = event;
+						if (!track.channels[channel].controllers) {
+							track.channels[channel].controllers = {};
+						}
+						if (typeof track.channels[channel].controllers[controller] === "undefined") {
+							// Only capture first first controller value
+							track.channels[channel].controllers[controller] = value;
+						} else {
+							// Controller values changed in the middle of the track - that's
+							// interesting so we'll log it.
+							console.info("Controller Value changed in middle of Track", event);
+						}
+					}
+
+					if(typeof event.program !== "undefined") {
+						const { program } = event;
+						if (typeof track.channels[channel].program === "undefined") {
+							// Only capture first first program value
+							track.channels[channel].program = program;
+						} else {
+							// Program changed in the middle of the track - that's
+							// interesting so we'll log it.
+							console.info("Program changed in middle of Track", event);
+						}
+					}
 				}
 			}
 
 			if (eventRes.meta) {
-				if (eventRes.meta.channel) {
-					if (!track.channelMeta) {
-						track.channelMeta = {};
+				const { channel, ...rest } = eventRes.meta;
+				if (typeof channel !== "undefined") {
+					if (!track.channels[channel]) {
+						track.channels[channel] = {};
 					}
-					if (!track.channelMeta[eventRes.meta.channel]) {
-						track.channelMeta[eventRes.meta.channel] = {};
-					}
-					meta = track.channelMeta[eventRes.meta.channel];
+					meta = track.channels[channel];
 				}
-				Object.assign(meta, eventRes.meta);
+				Object.assign(meta, rest);
 			}
 
 			index = eventRes.index;
@@ -246,6 +285,7 @@ function parseEvent (view, index, status) {
 						case 0x05:
 						case 0x06:
 						case 0x07:
+							// Lyrics, notes etc.
 							event = { type: status, metaType, text };
 							break;
 						case 0x02:
@@ -293,6 +333,8 @@ function parseEvent (view, index, status) {
 						case 0x7F:
 							console.info("System Exclusive Message not supported");
 							break;
+						default:
+							console.debug("Unrecognised meta event 0x" + metaType.toString(16));
 					}
 					index += length;
 					break;
