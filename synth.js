@@ -7,6 +7,7 @@ const noteRatio = Math.exp(Math.LN2 / 12);
 
 const noteMap = {};
 
+/** @type {AudioContext} */
 let audioCtx;
 
 function getNoteFreq (num) {
@@ -68,7 +69,7 @@ function addAnalyser (fn) {
 
 const synth = {
     initCtx () {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        audioCtx = (window.AudioContext || window.webkitAudioContext)();
         this.destination = audioCtx.createGain();
 
         this.destination.gain.setValueAtTime(0.25, 0);
@@ -286,6 +287,53 @@ const instruments = {
 
       return source;
   },
+  harpsichord (freq) {
+    const sampleCount = audioCtx.sampleRate / freq;
+
+    var myArrayBuffer = audioCtx.createBuffer(2, sampleCount, audioCtx.sampleRate);
+
+    for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
+    // This gives us the actual array that contains the data
+      var nowBuffering = myArrayBuffer.getChannelData(channel);
+      for (var i = 0; i < myArrayBuffer.length; i++) {
+        const x = i / sampleCount;
+
+        if (x < 0.05) {
+          nowBuffering[i] = 0.9 * (x / 0.05);
+        } else if (x < 0.5) {
+          nowBuffering[i] = (0.4 - 0.9) * ((x - 0.05) / (0.5 - 0.05)) + 0.9;
+        } else if (x < 0.95) {
+          nowBuffering[i] = (-0.4 + 0.9) * ((x - 0.5) / (0.95 - 0.5)) + -0.9;
+        } else {
+          nowBuffering[i] = (0 - -0.4) * ((x - 0.95) / (1 - 0.95)) + -0.4;
+        }
+      }
+    }
+
+    const canvas = document.getElementById('wave-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.beginPath();
+    ctx.moveTo(0, (1-nowBuffering[0]) * canvas.height / 2);
+
+    for(var i = 1; i < nowBuffering.length; i++) {
+        ctx.lineTo(i / (nowBuffering.length - 1) * canvas.width, (1-nowBuffering[i]) * canvas.height / 2);
+    }
+    ctx.stroke();
+
+    // Get an AudioBufferSourceNode.
+    // This is the AudioNode to use when we want to play an AudioBuffer
+    const source = audioCtx.createBufferSource();
+
+    // set the buffer in the AudioBufferSourceNode
+    source.buffer = myArrayBuffer;
+
+    source.loop = true;
+
+    return source;
+
+  },
 }
 
 /**
@@ -337,38 +385,49 @@ function impactNote (audioCtx, source, gain, duration = 1) {
   };
 }
 
+/**
+ *
+ * @param {AudioContext} audioCtx
+ * @param {number} freq
+ * @param {number} gain
+ * @param {number} program
+ */
 function createNote (audioCtx, freq, gain, program) {
+  /** @type {AudioNode} */
   let source;
-  switch (program % 8) {
-  case 0: // Sine
-    source = instruments.sine(freq);
-    break;
-  case 1: // Square
-    source = instruments.square(freq);
-    break;
-  case 2: // Sawtooth
-    source = instruments.sawtooth(freq);
-    break;
-  case 3: // Periodic
-    source = instruments.periodic(freq);
-    break;
-  case 4: // Organ
-    source = instruments.organ(freq);
-    break;
-  case 5: // Piano
-    source = instruments.piano(freq);
-    break;
-  case 6: // Fourier In
-    source = instruments.fourierIn(freq);
-    break;
-  case 7: // Fourier Out
-    source = instruments.fourierOut(freq);
-    break;
-  default:
-    throw Error("No program (instrument) selected");
+  switch (program % 9) {
+    case 0: // Sine
+      source = instruments.sine(freq);
+      break;
+    case 1: // Square
+      source = instruments.square(freq);
+      break;
+    case 2: // Sawtooth
+      source = instruments.sawtooth(freq);
+      break;
+    case 3: // Periodic
+      source = instruments.periodic(freq);
+      break;
+    case 4: // Organ
+      source = instruments.organ(freq);
+      break;
+    case 5: // Piano
+      source = instruments.piano(freq);
+      break;
+    case 6: // Fourier In
+      source = instruments.fourierIn(freq);
+      break;
+    case 7: // Fourier Out
+      source = instruments.fourierOut(freq);
+      break;
+    case 8: // Harpsichord
+      source = instruments.harpsichord(freq);
+      break;
+    default:
+      throw Error("No program (instrument) selected");
   }
 
-  return program > 7 ?
+  return program > 8 ?
     impactNote(audioCtx, source, gain) :
     rampOnOff(audioCtx, source, gain);
 }
