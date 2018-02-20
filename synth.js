@@ -7,6 +7,11 @@ const noteRatio = Math.exp(Math.LN2 / 12);
 
 const noteMap = {};
 
+const samples = [
+    /* Piano       */ [ 0.000,0.307,0.573,0.747,0.800,0.787,0.760,0.680,0.640,0.613,0.587,0.587,0.587,0.600,0.600,0.587,0.587,0.587,0.587,0.573,0.573,0.507,0.013,-0.360,-0.387,-0.480,-0.533,-0.533,-0.533,-0.520,-0.507,-0.480,-0.467,-0.467,-0.520,-0.707,-0.760,-0.693,-0.627,-0.440,-0.267 ],
+    /* Harpsichord */ [ 0.16230,0.67908,0.32111,-0.58877,-1.00000,-0.94199,-0.55850,0.03696,0.46314,0.63582,0.61690,0.60914,0.74573,0.63213,0.06539,-0.39930,-0.26242,0.30947,0.85215,0.88659,0.16143,-0.52125,-0.15764,0.47264,0.55006,0.49175,0.16026,-0.23360,0.09168,0.63892,0.47759,-0.21595,-0.52192,-0.24893,0.02639,0.21168,0.18956,-0.14688,0.01834,0.64756,0.62990,-0.06248,-0.50504,-0.45004,-0.45111,-0.48428,-0.30258,-0.06713,0.14193,0.21624,0.28706,0.43597,0.24622,-0.17142,-0.29375,-0.30724,-0.49496,-0.40658,0.05510,0.17006,-0.09740,-0.13659,0.11913,0.29938,0.12544,-0.17608,-0.27386,-0.25795,-0.22342,-0.26339,-0.55598,-0.84953,-0.73477,-0.39785,-0.04210 ],
+];
+
 /** @type {AudioContext} */
 let audioCtx;
 
@@ -239,42 +244,45 @@ const instruments = {
 
       return source;
   },
+  sampler (values, freq) {
+
+    var myArrayBuffer = audioCtx.createBuffer(2, values.length, values.length * freq);
+
+    for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
+    // This gives us the actual array that contains the data
+        var nowBuffering = myArrayBuffer.getChannelData(channel);
+        for (var i = 0; i < myArrayBuffer.length; i++) {
+            nowBuffering[i] = values[i];
+        }
+    }
+
+    const canvas = document.getElementById('wave-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.beginPath();
+    ctx.moveTo(0, (1-values[0]) * canvas.height / 2);
+
+    for(var i = 1; i < values.length; i++) {
+        ctx.lineTo(i / (values.length - 1) * canvas.width, (1-values[i]) * canvas.height / 2);
+    }
+    ctx.stroke();
+
+    // Get an AudioBufferSourceNode.
+    // This is the AudioNode to use when we want to play an AudioBuffer
+    const source = audioCtx.createBufferSource();
+
+    // set the buffer in the AudioBufferSourceNode
+    source.buffer = myArrayBuffer;
+
+    source.loop = true;
+
+    return source;
+  },
   fourierIn (freq) {
+    const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
 
-      const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
-
-      var myArrayBuffer = audioCtx.createBuffer(2, values.length, values.length * freq);
-
-      for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
-      // This gives us the actual array that contains the data
-          var nowBuffering = myArrayBuffer.getChannelData(channel);
-          for (var i = 0; i < myArrayBuffer.length; i++) {
-              nowBuffering[i] = values[i];
-          }
-      }
-
-      const canvas = document.getElementById('wave-canvas');
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.beginPath();
-      ctx.moveTo(0, (1-values[0]) * canvas.height / 2);
-
-      for(var i = 1; i < values.length; i++) {
-          ctx.lineTo(i / (values.length - 1) * canvas.width, (1-values[i]) * canvas.height / 2);
-      }
-      ctx.stroke();
-
-      // Get an AudioBufferSourceNode.
-      // This is the AudioNode to use when we want to play an AudioBuffer
-      const source = audioCtx.createBufferSource();
-
-      // set the buffer in the AudioBufferSourceNode
-      source.buffer = myArrayBuffer;
-
-      source.loop = true;
-
-      return source;
+    return this.sampler(values, freq);
   },
   fourierOut (freq) {
       const source = audioCtx.createOscillator();
@@ -293,20 +301,30 @@ const instruments = {
 
     var myArrayBuffer = audioCtx.createBuffer(2, sampleCount, audioCtx.sampleRate);
 
+    const x0 = 0;
+    const x1 = 0.05;
+    const x2 = 0.5;
+    const x3 = 0.95;
+    const x4 = 1;
+
+    const yMax0 = 0.9;
+    const yMax1 = 0.4;
+    const yMid = 0;
+
     for (var channel = 0; channel < myArrayBuffer.numberOfChannels; channel++) {
     // This gives us the actual array that contains the data
       var nowBuffering = myArrayBuffer.getChannelData(channel);
       for (var i = 0; i < myArrayBuffer.length; i++) {
         const x = i / sampleCount;
 
-        if (x < 0.05) {
-          nowBuffering[i] = 0.9 * (x / 0.05);
-        } else if (x < 0.5) {
-          nowBuffering[i] = (0.4 - 0.9) * ((x - 0.05) / (0.5 - 0.05)) + 0.9;
-        } else if (x < 0.95) {
-          nowBuffering[i] = (-0.4 + 0.9) * ((x - 0.5) / (0.95 - 0.5)) + -0.9;
+        if (x < x1) {
+          nowBuffering[i] = yMax0 * (x / x1);
+        } else if (x < x2) {
+          nowBuffering[i] = (yMax1 - yMax0) * ((x - x1) / (x2 - x1)) + yMax0;
+        } else if (x < x3) {
+          nowBuffering[i] = (-yMax1 + yMax0) * ((x - x2) / (x3 - x2)) + -yMax0;
         } else {
-          nowBuffering[i] = (0 - -0.4) * ((x - 0.95) / (1 - 0.95)) + -0.4;
+          nowBuffering[i] = (yMid - -yMax1) * ((x - x3) / (x4 - x3)) + -yMax1;
         }
       }
     }
@@ -396,7 +414,7 @@ function impactNote (audioCtx, source, gain, duration = 1) {
 function createNote (audioCtx, freq, gain, program) {
   /** @type {AudioNode} */
   let source;
-  switch (program % 9) {
+  switch ((program/2)|0) {
     case 0: // Sine
       source = instruments.sine(freq);
       break;
@@ -425,10 +443,15 @@ function createNote (audioCtx, freq, gain, program) {
       source = instruments.harpsichord(freq);
       break;
     default:
-      throw Error("No program (instrument) selected");
+        const sampleNo = ((program/2)|0) - 9;
+        if (sampleNo < samples.length) {
+            source = instruments.sampler(samples[sampleNo], freq);
+        } else {
+            throw Error("No program (instrument) selected");
+        }
   }
 
-  return program > 8 ?
+  return program % 2 ?
     impactNote(audioCtx, source, gain) :
     rampOnOff(audioCtx, source, gain);
 }
