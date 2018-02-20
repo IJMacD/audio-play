@@ -1,4 +1,4 @@
-class MidiNode {
+class MidiPlayer {
 	constructor (synth) {
 		this.synth = synth;
 	}

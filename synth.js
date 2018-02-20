@@ -69,7 +69,8 @@ function addAnalyser (fn) {
 
 const synth = {
     initCtx () {
-        audioCtx = (window.AudioContext || window.webkitAudioContext)();
+        // @ts-ignore
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         this.destination = audioCtx.createGain();
 
         this.destination.gain.setValueAtTime(0.25, 0);

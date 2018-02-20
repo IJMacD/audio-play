@@ -26,26 +26,13 @@
 }
 #fourier-coef {
     overflow: hidden;
+    display: none;
 }
 </style>
 </head>
 <body>
 <div id="keys"></div>
-<br>
-<input type="range" min="0" max="1" step="0.05" value="0.25" id="volume-input" />
-<input type="number" id="instrument-input" min="0" max="15" value="0" />
-<ol start="0">
-    <li value="0">Sine</li>
-    <li value="1">Square</li>
-    <li value="2">Sawtooth</li>
-    <li value="3">Periodic</li>
-    <li value="4">Organ</li>
-    <li value="5">Piano</li>
-    <li value="6">Fourier In</li>
-    <li value="7">Fourier Out</li>
-    <li value="8">Harpsichord</li>
-</ol>
-<br/>
+<div id="synth-root"></div>
 <input type="file" id="file-input" />
 <button id="play-btn">Play MIDI</button>
 <div id="debug-output"></div>
@@ -64,6 +51,8 @@
 "use strict";
 
 let synthTracks;
+let instrument = parseInt(localStorage.getItem("instrument"), 10) || 0;
+let volume = parseFloat(localStorage.getItem("volume"), 10) || 0.25;
 
 const keysDiv = document.getElementById('keys');
 for (let i = 0; i < 96; i++) {
@@ -72,9 +61,7 @@ for (let i = 0; i < 96; i++) {
     btn.innerText = synth.getNoteName(num);
     btn.className = synth.isSharp(num) ? "key sharp" : "key";
     btn.addEventListener('mousedown', function (e){
-        const select = document.getElementById('instrument-input');
-        const program = parseInt(select.value, 10)
-        synth.noteOn(program, num);
+        synth.noteOn(instrument, num);
     });
     btn.addEventListener('mouseup', function (e){
         synth.noteOff(num);
@@ -85,22 +72,9 @@ for (let i = 0; i < 96; i++) {
     keysDiv.appendChild(btn);
 }
 
-const initialVolume = localStorage.getItem("volume") || 0.25;
-const volumeInput = document.getElementById('volume-input');
-volumeInput.value = initialVolume;
-synth.setVolume(initialVolume);
-volumeInput.addEventListener('change', function (e) {
-    synth.setVolume(e.target.value, synth.currentTime + 1);
-    localStorage.setItem("volume", e.target.value)
-});
+synth.setVolume(volume);
+renderSynthUI({ instrument, volume });
 
-
-const initialInstrument = localStorage.getItem("instrument") || 0;
-const instrumentInput = document.getElementById('instrument-input');
-instrumentInput.value = initialInstrument;
-instrumentInput.addEventListener('change', function (e) {
-	localStorage.setItem("instrument", e.target.value);
-});
 
 synth.addAnalyser(function (analyser) {
 
@@ -156,38 +130,50 @@ synth.addAnalyser(function (analyser) {
     }
 });
 
+function setInstrument (val) {
+    instrument = parseInt(val, 10);
+    localStorage.setItem("instrument", instrument);
+    renderSynthUI({ instrument, volume });
+}
+
+function setVolume (val) {
+    volume = parseFloat(val, 10);
+    synth.setVolume(val, synth.currentTime + 1);
+    localStorage.setItem("volume", val)
+    renderSynthUI({ instrument, volume });
+}
+
 const keyMap = '`1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./';
 const dvorakMap = '1234567890[]\',.pyfgcrl/=aoeuidhtns-\\\\;qjkxbmwvz';
 
 document.addEventListener('keydown', function (e) {
     if (e.key === "ArrowUp") {
-        const instrument = document.getElementById('instrument-input');
-        instrument.value = parseInt(instrument.value, 10) + 1;
-        localStorage.setItem("instrument", instrument.value);
+        setInstrument(instrument + 1);
         e.preventDefault();
     } else if (e.key === "ArrowDown") {
-        const instrument = document.getElementById('instrument-input');
-        instrument.value = parseInt(instrument.value, 10) - 1
-        localStorage.setItem("instrument", instrument.value);
+        setInstrument(instrument - 1);
+        e.preventDefault();
+    } else if (e.key === "ArrowLeft") {
+        setVolume(volume - 0.05);
+        e.preventDefault();
+    } else if (e.key === "ArrowRight") {
+        setVolume(volume + 0.05);
         e.preventDefault();
     }
     else if(e.target.type !== "text" && e.target.type !== "number") {
-        const index = e.key === "#" ? 25 : keyMap.indexOf(e.key);
+        const index = e.key === "#" ? 25 : keyMap.indexOf(e.key.toLowerCase());
 
         if (index < 0) {
             return;
         };
 
-        const select = document.getElementById('instrument-input');
-        const program = parseInt(select.value, 10)
-
         e.preventDefault();
-        synth.noteOn(program, index + 23);
+        synth.noteOn(instrument, index + 23);
     }
 });
 
 document.addEventListener('keyup', function (e) {
-    const index = e.key === "#" ? 25 : keyMap.indexOf(e.key);
+    const index = e.key === "#" ? 25 : keyMap.indexOf(e.key.toLowerCase());
 
     if (index < 0) {
         return;
@@ -219,19 +205,17 @@ document.getElementById('play-btn').addEventListener('click', function () {
 		var reader = new FileReader();
 
 		reader.onload = function(e) {
-			const midiNode = new MidiNode(synth);
-			// midiNode.connect(gainNode);
-			midiNode.openFile(e.target.result);
-            synthTracks = midiNode.start();
+			const midi = new MidiPlayer(synth);
+			midi.openFile(e.target.result);
+            synthTracks = midi.start();
 		}
 
 		reader.readAsArrayBuffer(fileInput.files[0]);
 	}
 	else {
-		const midiNode = new MidiNode(synth);
-		// midiNode.connect(gainNode);
-		midiNode.openFile(sample);
-		synthTracks = midiNode.start();
+		const midi = new MidiPlayer(synth);
+		midi.openFile(sample);
+		synthTracks = midi.start();
 	}
 
 });
@@ -326,7 +310,7 @@ function doFourier () {
     Xk_im = Float32Array.from(range(N-1).map(k => 2/N * values.map((xn,n) => xn * Math.sin(2 * Math.PI * k * n / N) ).reduce((a,b) => a+b, 0) ));
 
 
-    document.getElementById("fourier-coef").innerHTML = Xk_re.map(x => x.toFixed(2)).join() + "<br>" + Xk_im.map(x => x.toFixed(2)).join();
+    document.getElementById("fourier-coef").innerHTML = Array.from(Xk_re).map(x => x.toFixed(2)).join() + "<br>" + Array.from(Xk_im).map(x => x.toFixed(2)).join();
 
     const canvas2 = document.getElementById('fourier-out');
     const ctx2 = canvas2.getContext('2d');
@@ -359,6 +343,33 @@ function debugMidiTrack (track, index) {
 
 function debugMidiChannel (channel, data) {
     return "Channel " + (parseInt(channel, 10) + 1) + ": " + (channel !== "9" && typeof data.program !== "undefined" ? GM_PROGRAMS[data.program] : "");
+}
+
+function handleInstrumentChange (e) {
+	setInstrument(parseInt(e.target.value), 10);
+}
+
+function handleVolumeChange (e) {
+	setVolume(parseFloat(e.target.value), 10);
+}
+
+function renderSynthUI ({ instrument, volume }) {
+    const inner = `
+        <input type="range" min="0" max="1" step="0.05" value="${ volume }" id="volume-input" onChange="handleVolumeChange(event)" />
+        <input type="number" id="instrument-input" min="0" max="15" value="${ instrument }" onChange="handleInstrumentChange(event)" />
+        <p>${instrument > 8 ? "Fade" : "Sustain"}</p>
+        <ol start="0">
+            <li value="0" style="font-weight: ${instrument % 9 === 0 ? "bold" : "normal"}">Sine</li>
+            <li value="1" style="font-weight: ${instrument % 9 === 1 ? "bold" : "normal"}">Square</li>
+            <li value="2" style="font-weight: ${instrument % 9 === 2 ? "bold" : "normal"}">Sawtooth</li>
+            <li value="3" style="font-weight: ${instrument % 9 === 3 ? "bold" : "normal"}">Periodic</li>
+            <li value="4" style="font-weight: ${instrument % 9 === 4 ? "bold" : "normal"}">Organ</li>
+            <li value="5" style="font-weight: ${instrument % 9 === 5 ? "bold" : "normal"}">Piano</li>
+            <li value="6" style="font-weight: ${instrument % 9 === 6 ? "bold" : "normal"}">Fourier In</li>
+            <li value="7" style="font-weight: ${instrument % 9 === 7 ? "bold" : "normal"}">Fourier Out</li>
+            <li value="8" style="font-weight: ${instrument % 9 === 8 ? "bold" : "normal"}">Harpsichord</li>
+        </ol>`;
+    document.getElementById("synth-root").innerHTML = inner;
 }
 </script>
 </body>
