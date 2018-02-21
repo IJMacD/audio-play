@@ -79,6 +79,11 @@ for (let i = 0; i < 96; i++) {
     btn.addEventListener('mouseleave', function (e){
         synth.noteOff(num);
     });
+    btn.addEventListener('mouseenter', function (e){
+        if (e.which === 1) {
+            synth.noteOn(instrument, num);
+        }
+    });
     keysDiv.appendChild(btn);
 }
 
