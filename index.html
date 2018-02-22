@@ -58,7 +58,7 @@ canvas {
 <div class="comp">
     <h2>MIDI</h2>
     <input type="file" id="file-input" />
-    <button id="play-btn">Play MIDI</button>
+    <button id="midi-play-btn">Play MIDI</button>
     <div id="debug-output"></div>
 </div>
 <div class="comp">
@@ -75,6 +75,7 @@ canvas {
     <canvas id="fourier-out" width="200" style="border: 1px solid black;"></canvas>
     <p id="fourier-coef"></p>
 </div>
+<div id="record-root" class="comp"></div>
 <script src="midi.js"></script>
 <script src="synth.js"></script>
 <script src="general-midi.js"></script>
@@ -86,6 +87,23 @@ let synthTracks;
 let instrument = parseInt(localStorage.getItem("instrument"), 10) || 0;
 let volume = parseFloat(localStorage.getItem("volume"), 10) || 0.25;
 
+let isRecording = false;
+let recordingStart = 0;
+let recordingData = [];
+
+function recordNoteOn (instrument, key) {
+    if (isRecording) {
+        if (recordingData.length === 0) recordingStart = synth.currentTime;
+        recordingData.push({ type: 'noteOn', instrument, key, when: synth.currentTime - recordingStart });
+    }
+}
+
+function recordNoteOff (key) {
+    if (isRecording) {
+        recordingData.push({ type: 'noteOff', key, when: synth.currentTime - recordingStart });
+    }
+}
+
 const keysDiv = document.getElementById('keys');
 for (let i = 0; i < 96; i++) {
     const btn = document.createElement('button');
@@ -94,16 +112,20 @@ for (let i = 0; i < 96; i++) {
     btn.className = synth.isSharp(num) ? "key sharp" : "key";
     btn.addEventListener('mousedown', function (e){
         synth.noteOn(instrument, num);
+        recordNoteOn(instrument, num);
     });
     btn.addEventListener('mouseup', function (e){
         synth.noteOff(num);
+        recordNoteOff(num);
     });
     btn.addEventListener('mouseleave', function (e){
         synth.noteOff(num);
+        recordNoteOff(num);
     });
     btn.addEventListener('mouseenter', function (e){
         if (e.which === 1) {
             synth.noteOn(instrument, num);
+            recordNoteOn(instrument, num);
         }
     });
     keysDiv.appendChild(btn);
@@ -112,6 +134,7 @@ for (let i = 0; i < 96; i++) {
 synth.setVolume(volume);
 renderSynthUI({ instrument, volume });
 
+renderRecordUI ({ isRecording, recordingData });
 
 synth.addAnalyser(function (analyser) {
 
@@ -197,6 +220,22 @@ document.addEventListener('keydown', function (e) {
         setVolume(volume + 0.05);
         e.preventDefault();
     }
+    else if (e.key === " ") {
+        if (isRecording) {
+            handleRecordBtn();
+            if (e.shiftKey) {
+                // Shift should restart recording, which is like pressing the button twice
+                handleRecordBtn();
+            }
+        } else {
+            if (e.shiftKey) {
+                handleRecordBtn();
+            } else {
+                handleRecordPlayBtn();
+            }
+        }
+        e.preventDefault();
+    }
     else if(e.target.type !== "text" && e.target.type !== "number") {
         const index = e.key === "#" ? 25 : keyMap.indexOf(e.key.toLowerCase());
 
@@ -206,6 +245,7 @@ document.addEventListener('keydown', function (e) {
 
         e.preventDefault();
         synth.noteOn(instrument, index + 23);
+        recordNoteOn(instrument, index + 23);
     }
 });
 
@@ -218,6 +258,7 @@ document.addEventListener('keyup', function (e) {
 
     e.preventDefault();
     synth.noteOff(index + 23);
+    recordNoteOff(index + 23);
 });
 
 document.getElementById('file-input').addEventListener("change", function (e) {
@@ -235,7 +276,7 @@ document.getElementById('file-input').addEventListener("change", function (e) {
     const midi = parseMidi;
 });
 
-document.getElementById('play-btn').addEventListener('click', function () {
+document.getElementById('midi-play-btn').addEventListener('click', function () {
 
 	const fileInput = document.getElementById('file-input');
 	if (fileInput.files && fileInput.files[0]) {
@@ -410,6 +451,40 @@ function renderSynthUI ({ instrument, volume }) {
             <li value="10" style="font-weight: ${((instrument/2)|0) === 10 ? "bold" : "normal"}">Sample 2</li>
         </ol>`;
     document.getElementById("synth-root").innerHTML = inner;
+}
+
+function handleRecordBtn () {
+    if (isRecording) {
+        isRecording = false;
+        renderRecordUI({ isRecording, recordingData });
+    } else {
+        recordingData.length = 0;
+        isRecording = true;
+        renderRecordUI({ isRecording, recordingData });
+    }
+}
+
+function handleRecordPlayBtn () {
+    if (isRecording) {
+        return;
+    }
+
+    const now = synth.currentTime;
+
+    recordingData.forEach(({ type, instrument, key, when }) => {
+        if (type === "noteOn") {
+            synth.noteOn(instrument, key, now + when);
+        } else if (type === "noteOff") {
+            synth.noteOff(key, now + when);
+        }
+    });
+}
+
+function renderRecordUI ({ isRecording, recordingData }) {
+    document.getElementById("record-root").innerHTML = `
+        <h2>Record</h2>
+        <button onClick="handleRecordBtn()">${ isRecording ? "Stop" : "Record" }</button>
+        <button onClick="handleRecordPlayBtn()" ${ !isRecording && recordingData.length ? "" : "disabled" }>Play</button>`;
 }
 </script>
 </body>
