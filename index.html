@@ -3,6 +3,28 @@
 <meta charset="utf-8" />
 <title>AudioPlay</title>
 <style>
+body {
+    font-family: sans-serif;
+}
+.comp {
+    border: 1px solid #888;
+    margin: 4px 2px;
+    padding: 8px;
+    background-image: linear-gradient(to bottom, #EEE, #CCC);
+    display: inline-block;
+    border-radius: 3px;
+    vertical-align: top;
+}
+.comp h2 {
+    margin-top: 0;
+}
+canvas {
+    background: white;
+}
+#debug-output {
+    max-height: 270px;
+    overflow-y: auto;
+}
 #keys {
     overflow-x: auto;
     white-space: nowrap;
@@ -32,20 +54,20 @@
 </head>
 <body>
 <div id="keys"></div>
-<div id="synth-root"></div>
-<div>
+<div id="synth-root" class="comp"></div>
+<div class="comp">
     <h2>MIDI</h2>
     <input type="file" id="file-input" />
     <button id="play-btn">Play MIDI</button>
+    <div id="debug-output"></div>
 </div>
-<div id="debug-output"></div>
-<div>
+<div class="comp">
     <h2>Wave Analysis</h2>
     <canvas id="wave-canvas" width="200" style="border: 1px solid black;"></canvas>
     <canvas id="scope-canvas" width="256" style="border: 1px solid black;"></canvas>
     <canvas id="freq-canvas" width="256" style="border: 1px solid black;"></canvas>
 </div>
-<div>
+<div class="comp">
     <h2>Fourier</h2>
     <input type="text" id="fourier-values" value="0.000 0.307 0.573 0.747 0.800 0.787 0.760 0.680 0.640 0.613 0.587 0.587 0.587 0.600 0.600 0.587 0.587 0.587 0.587 0.573 0.573 0.507 0.013 -0.360 -0.387 -0.480 -0.533 -0.533 -0.533 -0.520 -0.507 -0.480 -0.467 -0.467 -0.520 -0.707 -0.760 -0.693 -0.627 -0.440 -0.267 " />
     <br />
@@ -370,6 +392,7 @@ function handleVolumeChange (e) {
 
 function renderSynthUI ({ instrument, volume }) {
     const inner = `
+        <h2>Synth</h2>
         <input type="range" min="0" max="1" step="0.05" value="${ volume }" id="volume-input" onChange="handleVolumeChange(event)" />
         <input type="number" id="instrument-input" min="0" max="15" value="${ instrument }" onChange="handleInstrumentChange(event)" />
         <p>${((instrument/2)|0)} ${instrument % 2 ? "Fade" : "Sustain"}</p>
