@@ -133,7 +133,8 @@ for (let i = 0; i < 96; i++) {
     });
     btn.addEventListener('mouseleave', function (e){
         synth.noteOff(num);
-        recordNoteOff(num);
+        // Bug: Adds erronous noteOff messages even if there isn't a corresponding noteOn
+        //recordNoteOff(num);
     });
     btn.addEventListener('mouseenter', function (e){
         if (e.which === 1) {
@@ -243,20 +244,19 @@ document.addEventListener('keydown', function (e) {
         setVolume(volume + 0.05);
         e.preventDefault();
     }
+    else if (e.key === "Enter") {
+        // if (e.shiftKey) {
+        //     // Shift should restart recording from current point (i.e. append, calc new start time etc.)
+        // }
+        handleRecordBtn();
+        e.preventDefault();
+    }
     else if (e.key === " ") {
         if (isRecording) {
+            // Stop recording
             handleRecordBtn();
-            if (e.shiftKey) {
-                // Shift should restart recording, which is like pressing the button twice
-                handleRecordBtn();
-            }
-        } else {
-            if (e.shiftKey) {
-                handleRecordBtn();
-            } else {
-                handleRecordPlayBtn();
-            }
         }
+        handleRecordPlayBtn();
         e.preventDefault();
     }
     else if(e.target.type !== "text" && e.target.type !== "number") {
