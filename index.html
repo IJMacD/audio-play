@@ -61,6 +61,7 @@ canvas {
     <button id="midi-play-btn">Play MIDI</button>
     <div id="debug-output"></div>
 </div>
+<div id="record-root" class="comp"></div>
 <div class="comp">
     <h2>Wave Analysis</h2>
     <canvas id="wave-canvas" width="200" style="border: 1px solid black;"></canvas>
@@ -75,7 +76,6 @@ canvas {
     <canvas id="fourier-out" width="200" style="border: 1px solid black;"></canvas>
     <p id="fourier-coef"></p>
 </div>
-<div id="record-root" class="comp"></div>
 <script src="midi.js"></script>
 <script src="synth.js"></script>
 <script src="general-midi.js"></script>
@@ -84,7 +84,7 @@ canvas {
 "use strict";
 
 let synthTracks;
-let instrument = parseInt(localStorage.getItem("instrument"), 10) || 0;
+let instrument = parseInt(localStorage.getItem("instrument"), 10) || 100;
 let volume = parseFloat(localStorage.getItem("volume"), 10) || 0.25;
 
 let isRecording = false;
@@ -208,10 +208,18 @@ const dvorakMap = '1234567890[]\',.pyfgcrl/=aoeuidhtns-\\\\;qjkxbmwvz';
 
 document.addEventListener('keydown', function (e) {
     if (e.key === "ArrowUp") {
-        setInstrument(instrument + 1);
+        if (e.shiftKey) {
+            setInstrument(instrument + 100);
+        } else {
+            setInstrument(instrument + 1);
+        }
         e.preventDefault();
     } else if (e.key === "ArrowDown") {
-        setInstrument(instrument - 1);
+        if (e.shiftKey) {
+            setInstrument(instrument - 100);
+        } else {
+            setInstrument(instrument - 1);
+        }
         e.preventDefault();
     } else if (e.key === "ArrowLeft") {
         setVolume(volume - 0.05);
@@ -432,23 +440,31 @@ function handleVolumeChange (e) {
 }
 
 function renderSynthUI ({ instrument, volume }) {
+    const instrumentFamily = (instrument/100)|0;
+    const instrumentType = instrument % 100;
+
     const inner = `
         <h2>Synth</h2>
         <input type="range" min="0" max="1" step="0.05" value="${ volume }" id="volume-input" onChange="handleVolumeChange(event)" />
-        <input type="number" id="instrument-input" min="0" max="15" value="${ instrument }" onChange="handleInstrumentChange(event)" />
-        <p>${((instrument/2)|0)} ${instrument % 2 ? "Fade" : "Sustain"}</p>
+        <input type="number" id="instrument-input" min="100" max="999" value="${ instrument }" onChange="handleInstrumentChange(event)" />
+        <p style="display: flex;">
+            <button onClick="setInstrument(${instrument - 100})">&lt;</button>
+            <span style="flex: 1; margin: 4px 8px;">${instrumentFamily === 3 ? "ADSR" : instrumentFamily === 2 ? "Fade" : "Sustain"}</span>
+            <button onClick="setInstrument(${instrument + 100})">&gt;</button>
+        </p>
         <ol start="0">
-            <li value="0" style="font-weight: ${((instrument/2)|0) === 0 ? "bold" : "normal"}">Sine</li>
-            <li value="1" style="font-weight: ${((instrument/2)|0) === 1 ? "bold" : "normal"}">Square</li>
-            <li value="2" style="font-weight: ${((instrument/2)|0) === 2 ? "bold" : "normal"}">Sawtooth</li>
-            <li value="3" style="font-weight: ${((instrument/2)|0) === 3 ? "bold" : "normal"}">Periodic</li>
-            <li value="4" style="font-weight: ${((instrument/2)|0) === 4 ? "bold" : "normal"}">Organ</li>
-            <li value="5" style="font-weight: ${((instrument/2)|0) === 5 ? "bold" : "normal"}">Piano</li>
-            <li value="6" style="font-weight: ${((instrument/2)|0) === 6 ? "bold" : "normal"}">Fourier In</li>
-            <li value="7" style="font-weight: ${((instrument/2)|0) === 7 ? "bold" : "normal"}">Fourier Out</li>
-            <li value="8" style="font-weight: ${((instrument/2)|0) === 8 ? "bold" : "normal"}">Harpsichord</li>
-            <li value="9" style="font-weight: ${((instrument/2)|0) === 9 ? "bold" : "normal"}">Sample 1</li>
-            <li value="10" style="font-weight: ${((instrument/2)|0) === 10 ? "bold" : "normal"}">Sample 2</li>
+            <li value="0" style="font-weight: ${instrumentType === 0 ? "bold" : "normal"}">Sine</li>
+            <li value="1" style="font-weight: ${instrumentType === 1 ? "bold" : "normal"}">Square</li>
+            <li value="2" style="font-weight: ${instrumentType === 2 ? "bold" : "normal"}">Sawtooth</li>
+            <li value="3" style="font-weight: ${instrumentType === 3 ? "bold" : "normal"}">Periodic</li>
+            <li value="4" style="font-weight: ${instrumentType === 4 ? "bold" : "normal"}">Organ</li>
+            <li value="5" style="font-weight: ${instrumentType === 5 ? "bold" : "normal"}">Piano</li>
+            <li value="6" style="font-weight: ${instrumentType === 6 ? "bold" : "normal"}">Fourier In</li>
+            <li value="7" style="font-weight: ${instrumentType === 7 ? "bold" : "normal"}">Fourier Out</li>
+            <li value="8" style="font-weight: ${instrumentType === 8 ? "bold" : "normal"}">Harpsichord</li>
+            <li value="9" style="font-weight: ${instrumentType === 9 ? "bold" : "normal"}">Sample 1</li>
+            <li value="10" style="font-weight: ${instrumentType === 10 ? "bold" : "normal"}">Sample 2</li>
+            <li value="11" style="font-weight: ${instrumentType === 11 ? "bold" : "normal"}">Sample 3</li>
         </ol>`;
     document.getElementById("synth-root").innerHTML = inner;
 }
