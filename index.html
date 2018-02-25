@@ -20,6 +20,7 @@ body {
 }
 canvas {
     background: white;
+    border: 1px solid black;
 }
 #debug-output {
     max-height: 270px;
@@ -64,16 +65,16 @@ canvas {
 <div id="record-root" class="comp"></div>
 <div class="comp">
     <h2>Wave Analysis</h2>
-    <canvas id="wave-canvas" width="200" style="border: 1px solid black;"></canvas>
-    <canvas id="scope-canvas" width="256" style="border: 1px solid black;"></canvas>
-    <canvas id="freq-canvas" width="256" style="border: 1px solid black;"></canvas>
+    <canvas id="wave-canvas" width="200"></canvas>
+    <canvas id="scope-canvas" width="256"></canvas>
+    <canvas id="freq-canvas" width="256"></canvas>
 </div>
 <div class="comp">
     <h2>Fourier</h2>
     <input type="text" id="fourier-values" value="0.000 0.307 0.573 0.747 0.800 0.787 0.760 0.680 0.640 0.613 0.587 0.587 0.587 0.600 0.600 0.587 0.587 0.587 0.587 0.573 0.573 0.507 0.013 -0.360 -0.387 -0.480 -0.533 -0.533 -0.533 -0.520 -0.507 -0.480 -0.467 -0.467 -0.520 -0.707 -0.760 -0.693 -0.627 -0.440 -0.267 " />
     <br />
-    <canvas id="fourier-in" width="200" style="border: 1px solid black;"></canvas>
-    <canvas id="fourier-out" width="200" style="border: 1px solid black;"></canvas>
+    <canvas id="fourier-in" width="200"></canvas>
+    <canvas id="fourier-out" width="200"></canvas>
     <p id="fourier-coef"></p>
 </div>
 <script src="midi.js"></script>
@@ -87,20 +88,32 @@ let synthTracks;
 let instrument = parseInt(localStorage.getItem("instrument"), 10) || 100;
 let volume = parseFloat(localStorage.getItem("volume"), 10) || 0.25;
 
+/**
+ * @typedef RecordingEvent
+ * @prop {'noteOn'|'noteOff'} type
+ * @prop {number} instrument
+ * @prop {number} key
+ * @prop {number} when
+ */
+
 let isRecording = false;
 let recordingStart = 0;
+
+/** @type {RecordingEvent[]} */
 let recordingData = [];
 
 function recordNoteOn (instrument, key) {
     if (isRecording) {
         if (recordingData.length === 0) recordingStart = synth.currentTime;
         recordingData.push({ type: 'noteOn', instrument, key, when: synth.currentTime - recordingStart });
+        renderRecordData({ recordingData });
     }
 }
 
 function recordNoteOff (key) {
     if (isRecording) {
         recordingData.push({ type: 'noteOff', key, when: synth.currentTime - recordingStart });
+        renderRecordData({ recordingData });
     }
 }
 
@@ -135,6 +148,8 @@ synth.setVolume(volume);
 renderSynthUI({ instrument, volume });
 
 renderRecordUI ({ isRecording, recordingData });
+
+renderRecordData({ recordingData });
 
 synth.addAnalyser(function (analyser) {
 
@@ -472,12 +487,12 @@ function renderSynthUI ({ instrument, volume }) {
 function handleRecordBtn () {
     if (isRecording) {
         isRecording = false;
-        renderRecordUI({ isRecording, recordingData });
     } else {
         recordingData.length = 0;
         isRecording = true;
-        renderRecordUI({ isRecording, recordingData });
     }
+    renderRecordUI({ isRecording, recordingData });
+    renderRecordData({ recordingData });
 }
 
 function handleRecordPlayBtn () {
@@ -499,9 +514,89 @@ function handleRecordPlayBtn () {
 function renderRecordUI ({ isRecording, recordingData }) {
     document.getElementById("record-root").innerHTML = `
         <h2>Record</h2>
-        <button onClick="handleRecordBtn()">${ isRecording ? "Stop" : "Record" }</button>
-        <button onClick="handleRecordPlayBtn()" ${ !isRecording && recordingData.length ? "" : "disabled" }>Play</button>`;
+        <p>
+            <button onClick="handleRecordBtn()">${ isRecording ? "Stop" : "Record" }</button>
+            <button onClick="handleRecordPlayBtn()" ${ !isRecording && recordingData.length ? "" : "disabled" }>Play</button>
+        </p>
+        <canvas id="record-canvas" width="600" height="300"></canvas>`;
 }
+
+/**
+ * @param {RecordingEvent[]} events
+ * @return {RecordingEvent[]}
+ */
+function normaliseEvents (events) {
+    const out = [];
+    const map = {};
+
+    events.forEach(evt => {
+        if (evt.type === "noteOn") {
+            if (!map[evt.key]) {
+                map[evt.key] = evt;
+            }
+        } else if (evt.type === "noteOff") {
+            if (map[evt.key]) {
+                map[evt.key].end = evt.when;
+                out.push(map[evt.key]);
+                map[evt.key] = null;
+            }
+        }
+    });
+
+    return out;
+}
+
+
+/**
+ * @param {{ recordingData: RecordingEvent[] }} props
+ */
+function renderRecordData(props) {
+    const { recordingData } = props;
+    /** @type {HTMLCanvasElement} */
+    const canvas = document.getElementById("record-canvas");
+
+    const ctx = canvas.getContext("2d");
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const minNote = 24;
+    const maxNote = 72;
+
+    const xScale = 50;
+    const yScale = canvas.height / (maxNote - minNote);
+
+    ctx.beginPath();
+    for (let i = 0; i < maxNote - minNote; i++) {
+        ctx.moveTo(0, i * yScale);
+        ctx.lineTo(canvas.width, i * yScale);
+    }
+    ctx.strokeStyle = "#CCC";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = yScale;
+    ctx.lineCap = "round";
+
+    const events = normaliseEvents(recordingData);
+
+    if (events.length) {
+
+        events.forEach(evt => {
+            if (evt.type === "noteOn") {
+                const x0 = evt.when * xScale;
+                const x1 = evt.end * xScale;
+                const y = canvas.height - (evt.key - minNote + 0.5) * yScale;
+
+                ctx.beginPath();
+                ctx.moveTo(x0, y);
+                ctx.lineTo(x1, y);
+                ctx.stroke();
+            }
+        });
+    }
+}
+
 </script>
 </body>
 </html>
