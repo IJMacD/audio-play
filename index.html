@@ -104,7 +104,7 @@ let recordingData = [];
 
 function recordNoteOn (instrument, key) {
     if (isRecording) {
-        if (recordingData.length === 0) recordingStart = synth.currentTime;
+        if (recordingStart === 0) recordingStart = synth.currentTime;
         recordingData.push({ type: 'noteOn', instrument, key, when: synth.currentTime - recordingStart });
         renderRecordData({ recordingData });
     }
@@ -249,6 +249,10 @@ document.addEventListener('keydown', function (e) {
         //     // Shift should restart recording from current point (i.e. append, calc new start time etc.)
         // }
         handleRecordBtn();
+        e.preventDefault();
+    }
+    else if (e.key === "Delete") {
+        handleRecordClearBtn();
         e.preventDefault();
     }
     else if (e.key === " ") {
@@ -485,12 +489,12 @@ function renderSynthUI ({ instrument, volume }) {
 }
 
 function handleRecordBtn () {
-    if (isRecording) {
-        isRecording = false;
-    } else {
-        recordingData.length = 0;
-        isRecording = true;
+    if (!isRecording) {
+        recordingStart = 0;
     }
+
+    isRecording = !isRecording;
+
     renderRecordUI({ isRecording, recordingData });
     renderRecordData({ recordingData });
 }
@@ -511,12 +515,24 @@ function handleRecordPlayBtn () {
     });
 }
 
+function handleRecordClearBtn () {
+    if (isRecording) {
+        return;
+    }
+
+    recordingData.length = 0;
+
+    renderRecordUI({ isRecording, recordingData });
+    renderRecordData({ recordingData });
+}
+
 function renderRecordUI ({ isRecording, recordingData }) {
     document.getElementById("record-root").innerHTML = `
         <h2>Record</h2>
         <p>
             <button onClick="handleRecordBtn()">${ isRecording ? "Stop" : "Record" }</button>
             <button onClick="handleRecordPlayBtn()" ${ !isRecording && recordingData.length ? "" : "disabled" }>Play</button>
+            <button onClick="handleRecordClearBtn()" ${ !isRecording && recordingData.length ? "" : "disabled" }>Clear</button>
         </p>
         <canvas id="record-canvas" width="600" height="300"></canvas>`;
 }
@@ -540,6 +556,14 @@ function normaliseEvents (events) {
                 out.push(map[evt.key]);
                 map[evt.key] = null;
             }
+        }
+    });
+
+    // Add remaining "un-closed" notes
+    Object.values(map).forEach(evt => {
+        if (evt){
+            evt.end = evt.when + 0.1;
+            out.push(evt);
         }
     });
 
