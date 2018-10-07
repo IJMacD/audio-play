@@ -56,11 +56,17 @@ canvas {
 <body>
 <div id="keys"></div>
 <div id="synth-root" class="comp"></div>
-<div class="comp">
-    <h2>MIDI</h2>
-    <input type="file" id="file-input" />
-    <button id="midi-play-btn">Play MIDI</button>
-    <div id="debug-output"></div>
+<div style="display: inline-flex;flex-direction: column;">
+    <div class="comp">
+        <h2>MIDI</h2>
+        <input type="file" id="file-input" />
+        <button id="midi-play-btn">Play MIDI</button>
+        <div id="debug-output"></div>
+    </div>
+    <div class="comp">
+        <h2>Recorded Notes</h2>
+        <div id="record-table"></div>
+    </div>
 </div>
 <div id="record-root" class="comp"></div>
 <div class="comp">
@@ -88,6 +94,11 @@ let synthTracks;
 let instrument = parseInt(localStorage.getItem("instrument"), 10) || 100;
 let volume = parseFloat(localStorage.getItem("volume"), 10) || 0.25;
 
+const tempo = 220;
+const noteStep = 60 / tempo;
+const noteSnap = false;
+const autoTiming = false;
+
 /**
  * @typedef RecordingEvent
  * @prop {'noteOn'|'noteOff'} type
@@ -104,16 +115,28 @@ let recordingData = [];
 
 function recordNoteOn (instrument, key) {
     if (isRecording) {
-        if (recordingStart === 0) recordingStart = synth.currentTime;
-        recordingData.push({ type: 'noteOn', instrument, key, when: synth.currentTime - recordingStart });
+        if (autoTiming) {
+            const when = recordingStart++ * noteStep;
+            recordingData.push({ type: 'noteOn', instrument, key, when });
+            recordingData.push({ type: 'noteOff', key, when: when + noteStep / 2 });
+        } else {
+            if (recordingStart === 0) recordingStart = synth.currentTime;
+            let when = synth.currentTime - recordingStart;
+            if (noteSnap) when = Math.round(when / noteStep) * noteStep;
+            recordingData.push({ type: 'noteOn', instrument, key, when });
+        }
         renderRecordData({ recordingData });
+        renderRecordDataTable({ recordingData });
     }
 }
 
 function recordNoteOff (key) {
-    if (isRecording) {
-        recordingData.push({ type: 'noteOff', key, when: synth.currentTime - recordingStart });
+    if (isRecording && !autoTiming) {
+        let when = synth.currentTime - recordingStart;
+        if (noteSnap) when = Math.round(when / noteStep) * noteStep;
+        recordingData.push({ type: 'noteOff', key, when });
         renderRecordData({ recordingData });
+        renderRecordDataTable({ recordingData });
     }
 }
 
@@ -151,6 +174,7 @@ renderSynthUI({ instrument, volume });
 renderRecordUI ({ isRecording, recordingData });
 
 renderRecordData({ recordingData });
+renderRecordDataTable({ recordingData });
 
 synth.addAnalyser(function (analyser) {
 
@@ -245,9 +269,12 @@ document.addEventListener('keydown', function (e) {
         e.preventDefault();
     }
     else if (e.key === "Enter") {
-        // if (e.shiftKey) {
-        //     // Shift should restart recording from current point (i.e. append, calc new start time etc.)
-        // }
+        if (e.shiftKey) {
+            // Shift should restart recording from current point (i.e. append, calc new start time etc.)
+        }
+        else if (e.altKey) {
+            handleRecordClearBtn();
+        }
         handleRecordBtn();
         e.preventDefault();
     }
@@ -497,6 +524,7 @@ function handleRecordBtn () {
 
     renderRecordUI({ isRecording, recordingData });
     renderRecordData({ recordingData });
+    renderRecordDataTable({ recordingData });
 }
 
 function handleRecordPlayBtn () {
@@ -524,6 +552,7 @@ function handleRecordClearBtn () {
 
     renderRecordUI({ isRecording, recordingData });
     renderRecordData({ recordingData });
+    renderRecordDataTable({ recordingData });
 }
 
 function renderRecordUI ({ isRecording, recordingData }) {
@@ -598,8 +627,18 @@ function renderRecordData(props) {
     ctx.lineWidth = 1;
     ctx.stroke();
 
+    ctx.beginPath();
+    for (let i = 0; i * xScale < canvas.width; i += noteStep) {
+        ctx.moveTo(i * xScale, 0);
+        ctx.lineTo(i * xScale, canvas.height);
+    }
+    ctx.strokeStyle = "#CCC";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
     ctx.strokeStyle = "#000";
-    ctx.lineWidth = yScale;
+    const lineWidth = yScale;
+    ctx.lineWidth = lineWidth;
     ctx.lineCap = "round";
 
     const events = normaliseEvents(recordingData);
@@ -608,8 +647,10 @@ function renderRecordData(props) {
 
         events.forEach(evt => {
             if (evt.type === "noteOn") {
-                const x0 = evt.when * xScale;
-                const x1 = evt.end * xScale;
+                const length = evt.end - evt.when;
+
+                const x0 = evt.when * xScale + (lineWidth / 2);
+                const x1 = evt.end * xScale + (lineWidth / 2) * (length > 0 ? -1 : 1);
                 const y = canvas.height - (evt.key - minNote + 0.5) * yScale;
 
                 ctx.beginPath();
@@ -619,6 +660,28 @@ function renderRecordData(props) {
             }
         });
     }
+}
+
+function renderRecordDataTable ({ recordingData }) {
+    const events = normaliseEvents(recordingData);
+    document.getElementById('record-table').innerHTML = `
+        <table>
+            <tr>
+                <th>Note</th>
+                <th>On</th>
+                <th>Length</th>
+            </tr>
+            ${events.map(evt => {
+                if (evt.type === "noteOn") {
+                    return `
+                        <tr>
+                            <td>${synth.getNoteName(evt.key)}</td>
+                            <td>${evt.when.toFixed(2)}</td>
+                            <td>${(evt.end - evt.when).toFixed(2)}</td>
+                        </tr>`;
+                }
+            }).join('')}
+        </table>`;
 }
 
 </script>
