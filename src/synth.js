@@ -1,5 +1,3 @@
-"use strict";
-
 const concertPitch = 440; // Note 49, A4, 440 Hz
 const concertPitchNum = 48; // (0 index)
 const sharps = [false, true, false, false, true, false, true, false, false, true, false, true];
@@ -132,6 +130,7 @@ const synth = {
 
 Object.defineProperty(synth, "currentTime", { get: () => audioCtx.currentTime });
 
+export default synth;
 
 const instruments = {
   sine (freq) {
@@ -139,7 +138,7 @@ const instruments = {
       source.frequency.setValueAtTime(freq, 0);
       source.type = "sine";
 
-      drawWave(fourier([0,1]));
+      // drawWave(fourier([0,1]));
 
       return source;
   },
@@ -197,7 +196,7 @@ const instruments = {
       imag[5] = 10;
 
       const fFn = fourier(imag.map(x=> x/131));
-      drawWave(fFn);
+      // drawWave(fFn);
 
       const wave = audioCtx.createPeriodicWave(real, imag);
 
@@ -207,7 +206,7 @@ const instruments = {
   },
   piano (freq) {
       var waveFn = fourier([0, 1, 0, 0.5]);
-      drawWave(waveFn);
+      // drawWave(waveFn);
 
       const sampleCount = audioCtx.sampleRate / freq;
       const wave = waveFn(sampleCount);
@@ -227,7 +226,7 @@ const instruments = {
   },
   organ (freq) {
       var waveFn = fourier([0, 1, 0, 0.2, 0, 0.04, 0, 0.08]);
-      drawWave(waveFn);
+      // drawWave(waveFn);
 
       const sampleCount = audioCtx.sampleRate / freq;
       const wave = waveFn(sampleCount);
@@ -281,19 +280,19 @@ const instruments = {
     return source;
   },
   fourierIn (freq) {
-    const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
+    // const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
 
-    return this.sampler(values, freq);
+    // return this.sampler(values, freq);
   },
   fourierOut (freq) {
       const source = audioCtx.createOscillator();
       source.frequency.setValueAtTime(freq, 0);
 
-      const wave = audioCtx.createPeriodicWave(Xk_re, Xk_im);
+      // const wave = audioCtx.createPeriodicWave(Xk_re, Xk_im);
 
-      drawWave(fourier(Xk_im));
+      // drawWave(fourier(Xk_im));
 
-      source.setPeriodicWave(wave);
+      // source.setPeriodicWave(wave);
 
       return source;
   },
