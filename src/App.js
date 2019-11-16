@@ -20,15 +20,9 @@ class App extends React.Component {
     constructor (props) {
         super(props);
 
-        this.state = {
-            noteStates: [],
-        };
-
-        this.noteOn = i => this.setState(oldState => ({ noteStates: [ ...oldState.noteStates, i ] }),synth.noteOn(203,i));
-        this.noteOff = i => this.setState(oldState => ({ noteStates: oldState.noteStates.filter(n => n !== i) }),synth.noteOff(i));
-
         this.handleKeyDown = this.handleKeyDown.bind(this);
         this.handleKeyUp = this.handleKeyUp.bind(this);
+        this.handleSynthNote = () => this.forceUpdate();
     }
 
     handleKeyDown (e) {
@@ -36,7 +30,7 @@ class App extends React.Component {
 
         if (note >= 0) {
             e.preventDefault();
-            this.noteOn(note);
+            synth.noteOn(203, note);
         }
     }
 
@@ -45,26 +39,28 @@ class App extends React.Component {
 
         if (note >= 0) {
             e.preventDefault();
-            this.noteOff(note);
+            synth.noteOff(note);
         }
     }
 
     componentDidMount () {
         document.addEventListener('keydown', this.handleKeyDown);
         document.addEventListener('keyup', this.handleKeyUp);
+        synth.addListener(this.handleSynthNote);
     }
 
     componentWillUnmount () {
         document.removeEventListener('keydown', this.handleKeyDown);
         document.removeEventListener('keyup', this.handleKeyUp);
+        synth.removeListener(this.handleSynthNote);
     }
 
     render () {
-        const { noteStates } = this.state;
+        const { noteStates } = synth;
 
         return (
             <div className="App">
-                <Keys noteStates={noteStates} noteOn={this.noteOn} noteOff={this.noteOff} />
+                <Keys noteStates={noteStates} noteOn={(i) => synth.noteOn(203, i)} noteOff={synth.noteOff.bind(synth)} />
             </div>
         );
     }

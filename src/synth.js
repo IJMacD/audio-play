@@ -4,6 +4,7 @@ const sharps = [false, true, false, false, true, false, true, false, false, true
 const noteRatio = Math.exp(Math.LN2 / 12);
 
 const noteMap = {};
+const noteListeners = [];
 
 const samples = [
     /* Piano       */ [ 0.000,0.307,0.573,0.747,0.800,0.787,0.760,0.680,0.640,0.613,0.587,0.587,0.587,0.600,0.600,0.587,0.587,0.587,0.587,0.573,0.573,0.507,0.013,-0.360,-0.387,-0.480,-0.533,-0.533,-0.533,-0.520,-0.507,-0.480,-0.467,-0.467,-0.520,-0.707,-0.760,-0.693,-0.627,-0.440,-0.267 ],
@@ -37,6 +38,8 @@ function noteOn (program, num, when, gain=1) {
         source.start(when);
 
         noteMap[num] = source;
+
+        notifyListeners();
     }
 }
 
@@ -44,7 +47,9 @@ function noteOff (num, when) {
 
     if (noteMap[num]) {
         noteMap[num].stop(when);
-        noteMap[num] = null;
+        delete noteMap[num];
+
+        notifyListeners();
     }
 }
 
@@ -69,6 +74,14 @@ function addAnalyser (fn) {
     analyser.connect(this.nextDestination);
 
     fn(analyser);
+}
+
+function notifyListeners () {
+  for (const fn of noteListeners) {
+    if (fn instanceof Function) {
+      fn();
+    }
+  }
 }
 
 const synth = {
@@ -126,9 +139,20 @@ const synth = {
     isSharp (num) {
         return sharps[num % 12];
     },
+
+    addListener (fn) {
+      noteListeners.push(fn);
+    },
+
+    removeListener (fn) {
+      const index = noteListeners.indexOf(fn);
+      noteListeners.splice(index, 1);
+    }
 };
 
 Object.defineProperty(synth, "currentTime", { get: () => audioCtx.currentTime });
+
+Object.defineProperty(synth, "noteStates", { get: () => Object.keys(noteMap).map(k => +k) });
 
 export default synth;
 
@@ -488,20 +512,20 @@ function createNote (audioCtx, freq, gain, program) {
   return instrumentFamily === 3 ?
     adsrNote(audioCtx, source, gain) :
     instrumentFamily === 2 ?
-    impactNote(audioCtx, source, gain) :
-    rampOnOff(audioCtx, source, gain);
+      impactNote(audioCtx, source, gain) :
+      rampOnOff(audioCtx, source, gain);
 }
 
 function fourier (coef) {
-const coefSum = coef.reduce((a,b) => a+b, 0);
-if (coefSum === 0) {
-  throw Error("You must supply some coefficients");
-}
-return function (sampleCount) {
-  return function (i) {
-    return coef.map((c,n) => (c / coefSum) * Math.sin(i * n / sampleCount * Math.PI * 2)).reduce((a,b) => a+b, 0);
+  const coefSum = coef.reduce((a,b) => a+b, 0);
+  if (coefSum === 0) {
+    throw Error("You must supply some coefficients");
   }
-}
+  return function (sampleCount) {
+    return function (i) {
+      return coef.map((c,n) => (c / coefSum) * Math.sin(i * n / sampleCount * Math.PI * 2)).reduce((a,b) => a+b, 0);
+    }
+  }
 }
 
 function generateArrayBuffer(audioCtx, wave, sampleCount) {

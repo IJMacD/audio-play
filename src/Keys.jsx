@@ -8,10 +8,10 @@ export default function Keys ({ noteStates, noteOn, noteOff }) {
                 <button
                     key={i}
                     className={`key ${Synth.isSharp(i) ? "sharp" : "key"} ${noteStates.includes(i) ? "on" : "off"}`}
-                    onMouseDown={() => noteOn(i)}
-                    onMouseUp={() => noteOff(i)}
-                    onMouseEnter={e => e.which === 1 && noteOn(i)}
-                    onMouseLeave={() => noteOff(i)}
+                    onPointerDown={() => noteOn(i)}
+                    onPointerUp={() => noteOff(i)}
+                    onPointerEnter={e => e.buttons & 1 && noteOn(i)}
+                    onPointerLeave={() => noteOff(i)}
                 >
                     {Synth.getNoteName(i)}
                 </button>
