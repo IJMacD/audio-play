@@ -19,63 +19,6 @@ function getNoteFreq (num) {
     return concertPitch * Math.pow(noteRatio, num - concertPitchNum);
 }
 
-function noteOn (program, num, when, gain=1) {
-
-    if (!audioCtx) {
-        this.initCtx();
-    }
-
-    if (!noteMap[num]) {
-
-        const freq = getNoteFreq(num);
-        const source = createNote(audioCtx, freq, gain, program);
-
-        // connect the AudioBufferSourceNode to the
-        // destination so we can hear the sound
-        source.connect(this.destination);
-
-        // start the source playing
-        source.start(when);
-
-        noteMap[num] = source;
-
-        notifyListeners();
-    }
-}
-
-function noteOff (num, when) {
-
-    if (noteMap[num]) {
-        noteMap[num].stop(when);
-        delete noteMap[num];
-
-        notifyListeners();
-    }
-}
-
-function setVolume (value, when) {
-    if (this.destination) {
-        if (typeof when === "undefined") {
-            when = audioCtx.currentTime;
-        }
-        this.destination.gain.linearRampToValueAtTime(value, when);
-    }
-}
-
-function addAnalyser (fn) {
-
-    if (!audioCtx) {
-        this.initCtx();
-    }
-
-    const analyser = audioCtx.createAnalyser();
-
-    this.destination.connect(analyser);
-    analyser.connect(this.nextDestination);
-
-    fn(analyser);
-}
-
 function notifyListeners () {
   for (const fn of noteListeners) {
     if (fn instanceof Function) {
@@ -97,13 +40,60 @@ const synth = {
         this.destination.connect(this.nextDestination);
     },
 
-    noteOn,
-
-    noteOff,
-
-    setVolume,
-
-    addAnalyser,
+    noteOn (program, num, when, gain=1) {
+    
+        if (!audioCtx) {
+            this.initCtx();
+        }
+    
+        if (!noteMap[num]) {
+    
+            const freq = getNoteFreq(num);
+            const source = createNote(audioCtx, freq, gain, program);
+    
+            // connect the AudioBufferSourceNode to the
+            // destination so we can hear the sound
+            source.connect(this.destination);
+    
+            // start the source playing
+            source.start(when);
+    
+            noteMap[num] = source;
+    
+            notifyListeners();
+        }
+    },
+    
+    noteOff (num, when) {
+        if (noteMap[num]) {
+            noteMap[num].stop(when);
+            delete noteMap[num];
+    
+            notifyListeners();
+        }
+    },
+    
+    setVolume (value, when) {
+        if (this.destination) {
+            if (typeof when === "undefined") {
+                when = audioCtx.currentTime;
+            }
+            this.destination.gain.linearRampToValueAtTime(value, when);
+        }
+    },
+    
+    addAnalyser (fn) {
+        if (!audioCtx) {
+            this.initCtx();
+        }
+    
+        const analyser = audioCtx.createAnalyser();
+    
+        this.destination.connect(analyser);
+        analyser.connect(this.nextDestination);
+    
+        fn(analyser);
+    },
 
     /** @static */
     createTrack(id) {
@@ -119,10 +109,10 @@ const synth = {
         return {
             destination: trackGain,
             nextDestination: this.destination,
-            noteOn,
-            noteOff,
-            setVolume,
-            addAnalyser,
+            noteOn: this.noteOn.bind(this),
+            noteOff: this.noteOff.bind(this),
+            setVolume: this.setVolume.bind(this),
+            addAnalyser: this.addAnalyser.bind(this),
         };
     },
 
@@ -147,6 +137,16 @@ const synth = {
     removeListener (fn) {
       const index = noteListeners.indexOf(fn);
       noteListeners.splice(index, 1);
+    },
+
+    playTune (notes) {
+      const now = audioCtx.currentTime;
+      const delta = 0.25;
+
+      notes.forEach((note, i) => {
+        this.noteOn(203, note, now + i * delta);
+        this.noteOff(note, now + (i + 1) * delta);
+      });
     }
 };
 
@@ -171,16 +171,16 @@ const instruments = {
       source.frequency.setValueAtTime(freq, 0);
       source.type = "square";
 
-      const canvas = document.getElementById('wave-canvas');
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // const canvas = document.getElementById('wave-canvas');
+      // const ctx = canvas.getContext('2d');
+      // ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(canvas.width / 2, 0);
-      ctx.lineTo(canvas.width / 2, canvas.height);
-      ctx.lineTo(canvas.width, canvas.height);
-      ctx.stroke();
+      // ctx.beginPath();
+      // ctx.moveTo(0, 0);
+      // ctx.lineTo(canvas.width / 2, 0);
+      // ctx.lineTo(canvas.width / 2, canvas.height);
+      // ctx.lineTo(canvas.width, canvas.height);
+      // ctx.stroke();
 
       return source;
   },
@@ -189,14 +189,14 @@ const instruments = {
       source.frequency.setValueAtTime(freq, 0);
       source.type = "sawtooth";
 
-      const canvas = document.getElementById('wave-canvas');
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // const canvas = document.getElementById('wave-canvas');
+      // const ctx = canvas.getContext('2d');
+      // ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      ctx.beginPath();
-      ctx.moveTo(0, canvas.height);
-      ctx.lineTo(canvas.width, 0);
-      ctx.stroke();
+      // ctx.beginPath();
+      // ctx.moveTo(0, canvas.height);
+      // ctx.lineTo(canvas.width, 0);
+      // ctx.stroke();
 
       return source;
   },
@@ -280,17 +280,17 @@ const instruments = {
         }
     }
 
-    const canvas = document.getElementById('wave-canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // const canvas = document.getElementById('wave-canvas');
+    // const ctx = canvas.getContext('2d');
+    // ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    ctx.beginPath();
-    ctx.moveTo(0, (1-values[0]) * canvas.height / 2);
+    // ctx.beginPath();
+    // ctx.moveTo(0, (1-values[0]) * canvas.height / 2);
 
-    for(var i = 1; i < values.length; i++) {
-        ctx.lineTo(i / (values.length - 1) * canvas.width, (1-values[i]) * canvas.height / 2);
-    }
-    ctx.stroke();
+    // for(var i = 1; i < values.length; i++) {
+    //     ctx.lineTo(i / (values.length - 1) * canvas.width, (1-values[i]) * canvas.height / 2);
+    // }
+    // ctx.stroke();
 
     // Get an AudioBufferSourceNode.
     // This is the AudioNode to use when we want to play an AudioBuffer
@@ -307,6 +307,9 @@ const instruments = {
     // const values = fourierValues.value.split(" ").map(x => parseFloat(x, 10)).filter(x => isFinite(x));
 
     // return this.sampler(values, freq);
+      const source = audioCtx.createOscillator();
+      source.frequency.setValueAtTime(freq, 0);
+      return source;
   },
   fourierOut (freq) {
       const source = audioCtx.createOscillator();
@@ -353,17 +356,17 @@ const instruments = {
       }
     }
 
-    const canvas = document.getElementById('wave-canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // const canvas = document.getElementById('wave-canvas');
+    // const ctx = canvas.getContext('2d');
+    // ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    ctx.beginPath();
-    ctx.moveTo(0, (1-nowBuffering[0]) * canvas.height / 2);
+    // ctx.beginPath();
+    // ctx.moveTo(0, (1-nowBuffering[0]) * canvas.height / 2);
 
-    for(var i = 1; i < nowBuffering.length; i++) {
-        ctx.lineTo(i / (nowBuffering.length - 1) * canvas.width, (1-nowBuffering[i]) * canvas.height / 2);
-    }
-    ctx.stroke();
+    // for(var i = 1; i < nowBuffering.length; i++) {
+    //     ctx.lineTo(i / (nowBuffering.length - 1) * canvas.width, (1-nowBuffering[i]) * canvas.height / 2);
+    // }
+    // ctx.stroke();
 
     // Get an AudioBufferSourceNode.
     // This is the AudioNode to use when we want to play an AudioBuffer
@@ -387,19 +390,19 @@ const instruments = {
 */
 function rampOnOff (audioCtx, source, gain) {
   const gainNode = audioCtx.createGain();
-  gainNode.gain.setValueAtTime(0, 0);
-
+  gainNode.gain.value = 0;
+  
   source.connect(gainNode);
   return {
-      connect: gainNode.connect.bind(gainNode),
-      start: (when = audioCtx.currentTime) => {
-          source.start(when);
-          gainNode.gain.linearRampToValueAtTime(gain, when + 0.1);
-      },
-      stop: (when = audioCtx.currentTime) => {
-          source.stop(when + 0.1);
-          gainNode.gain.linearRampToValueAtTime(0, when + 0.1);
-      },
+    connect: gainNode.connect.bind(gainNode),
+    start: (when = audioCtx.currentTime) => {
+        source.start(when);
+        gainNode.gain.linearRampToValueAtTime(gain, when + 0.01);
+    },
+    stop: (when = audioCtx.currentTime) => {
+      gainNode.gain.linearRampToValueAtTime(0.1, when + 0.15);
+      source.stop(when + 0.2);
+    },
   };
 }
 
@@ -435,25 +438,40 @@ function impactNote (audioCtx, source, gain, duration = 1) {
 * @param {number} duration
 * @return {AudioScheduledSourceNode}
 */
-function adsrNote (audioCtx, source, gain, duration = 5) {
+function adsrNote (audioCtx, source, gain, duration = 2) {
+
+  // Attack:  0.1s
+  // Decay:   0.1s
+  // Sustain: 2s
 
   const gainNode = audioCtx.createGain();
 
   source.connect(gainNode);
 
+  let end;
+
   return {
       connect: gainNode.connect.bind(gainNode),
       start: (when = audioCtx.currentTime) => {
+        // gainNode.gain.setValueAtTime(0, when);
+        // gainNode.gain.linearRampToValueAtTime(gain, when + 0.001);
+        // gainNode.gain.linearRampToValueAtTime(gain * 0.2, when + 0.2);
+        
         gainNode.gain.setValueAtTime(gain, when);
         // gainNode.gain.exponentialRampToValueAtTime(gain, when + 0.1);
         gainNode.gain.exponentialRampToValueAtTime(gain * 0.2, when + 0.1);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, when + duration);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, when + duration);
         source.start(when);
         source.stop(when + duration);
+        end = when + duration;
       },
       stop: (when = audioCtx.currentTime) => {
-        source.stop(when + 0.5);
-        gainNode.gain.linearRampToValueAtTime(0, when + 0.5);
+        // source.stop(when + 0.5);
+        // gainNode.gain.linearRampToValueAtTime(0, when + 0.5);
+        if (when + 0.2 < end) {
+          source.stop(when + 0.2);
+          gainNode.gain.linearRampToValueAtTime(0, when + 0.2);
+        }
     },
   };
 }

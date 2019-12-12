@@ -49,3 +49,14 @@ canvas {
   overflow: hidden;
   display: none;
 }
+.Staff {
+  font-size: 50px;
+  height: 60px;
+  background-image: linear-gradient(0deg, transparent, transparent 9px, black 9px, black 10px, transparent 10px, transparent 19px, black 19px, black 20px, transparent 20px, transparent 29px, black 29px, black 30px, transparent 30px, transparent 39px, black 39px, black 40px, transparent 40px, transparent 49px, black 49px, black 50px, transparent 50px, transparent);
+  background-position-y: 4px;
+  border-bottom: 1px solid rgba(128,256,256,0.5);
+}
+.Staff-note {
+  position: relative;
+  margin: 0 5px;
+}
