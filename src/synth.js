@@ -1,6 +1,6 @@
-const concertPitch = 440; // Note 49, A4, 440 Hz
-const concertPitchNum = 48; // (0 index)
-const sharps = [false, true, false, false, true, false, true, false, false, true, false, true];
+const concertPitch = 440; // Note 69, A4, 440 Hz
+const concertPitchNum = 68; // (0 index)
+const sharps = [false, true, false, true, false, false, true, false, true, false, true, false];
 const noteRatio = Math.exp(Math.LN2 / 12);
 
 const noteMap = {};
@@ -41,38 +41,38 @@ const synth = {
     },
 
     noteOn (program, num, when, gain=1) {
-    
+
         if (!audioCtx) {
             this.initCtx();
         }
-    
+
         if (!noteMap[num]) {
-    
+
             const freq = getNoteFreq(num);
             const source = createNote(audioCtx, freq, gain, program);
-    
+
             // connect the AudioBufferSourceNode to the
             // destination so we can hear the sound
             source.connect(this.destination);
-    
+
             // start the source playing
             source.start(when);
-    
+
             noteMap[num] = source;
-    
+
             notifyListeners();
         }
     },
-    
+
     noteOff (num, when) {
         if (noteMap[num]) {
             noteMap[num].stop(when);
             delete noteMap[num];
-    
+
             notifyListeners();
         }
     },
-    
+
     setVolume (value, when) {
         if (this.destination) {
             if (typeof when === "undefined") {
@@ -81,17 +81,17 @@ const synth = {
             this.destination.gain.linearRampToValueAtTime(value, when);
         }
     },
-    
+
     addAnalyser (fn) {
         if (!audioCtx) {
             this.initCtx();
         }
-    
+
         const analyser = audioCtx.createAnalyser();
-    
+
         this.destination.connect(analyser);
         analyser.connect(this.nextDestination);
-    
+
         fn(analyser);
     },
 
@@ -119,9 +119,9 @@ const synth = {
     /** @static */
     getNoteName (num) {
         const mod = num % 12;
-        const alpha = 'AABCCDDEFFGG'[mod];
+        const alpha = 'CCDDEFFGGAAB'[mod];
         const sharp = sharps[mod] ? '♯' : '';
-        const octave = Math.floor(num/12) + ((alpha === "A" || alpha === "B") ? 0 : 1);
+        const octave = Math.floor((num-21)/12) + ((alpha === "A" || alpha === "B") ? 0 : 1);
         return alpha + sharp + octave;
     },
 
@@ -147,6 +147,19 @@ const synth = {
         this.noteOn(203, note, now + i * delta);
         this.noteOff(note, now + (i + 1) * delta);
       });
+    },
+
+    getInstrumentList () {
+      const instrumentsCount = Object.keys(instruments).length - 1;
+      const sampleCount = samples.length;
+      const totalCount = instrumentsCount + sampleCount;
+      const list = [...Array(totalCount)].map((_,i) => i);
+
+      return [
+        ...list.map(i => i + 100),
+        ...list.map(i => i + 200),
+        ...list.map(i => i + 300),
+      ];
     }
 };
 
@@ -386,12 +399,12 @@ const instruments = {
 * @param {AudioContext} audioCtx
 * @param {AudioScheduledSourceNode} source
 * @param {number} gain
-* @return {AudioScheduledSourceNode}
+* @return
 */
 function rampOnOff (audioCtx, source, gain) {
   const gainNode = audioCtx.createGain();
   gainNode.gain.value = 0;
-  
+
   source.connect(gainNode);
   return {
     connect: gainNode.connect.bind(gainNode),
@@ -411,7 +424,7 @@ function rampOnOff (audioCtx, source, gain) {
 * @param {AudioScheduledSourceNode} source
 * @param {number} gain
 * @param {number} duration
-* @return {AudioScheduledSourceNode}
+* @return
 */
 function impactNote (audioCtx, source, gain, duration = 1) {
 
@@ -436,7 +449,7 @@ function impactNote (audioCtx, source, gain, duration = 1) {
 * @param {AudioScheduledSourceNode} source
 * @param {number} gain
 * @param {number} duration
-* @return {AudioScheduledSourceNode}
+* @return
 */
 function adsrNote (audioCtx, source, gain, duration = 2) {
 
@@ -456,7 +469,7 @@ function adsrNote (audioCtx, source, gain, duration = 2) {
         // gainNode.gain.setValueAtTime(0, when);
         // gainNode.gain.linearRampToValueAtTime(gain, when + 0.001);
         // gainNode.gain.linearRampToValueAtTime(gain * 0.2, when + 0.2);
-        
+
         gainNode.gain.setValueAtTime(gain, when);
         // gainNode.gain.exponentialRampToValueAtTime(gain, when + 0.1);
         gainNode.gain.exponentialRampToValueAtTime(gain * 0.2, when + 0.1);
@@ -487,7 +500,7 @@ function createNote (audioCtx, freq, gain, program) {
   const instrumentFamily = (program / 100)|0;
   const instrumentType = program % 100;
 
-  /** @type {AudioNode} */
+  /** @type {AudioScheduledSourceNode} */
   let source;
   switch (instrumentType) {
     case 0: // Sine

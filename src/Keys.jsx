@@ -1,21 +1,25 @@
 import React from 'react';
 import Synth from './synth';
 
-export default function Keys ({ noteStates, noteOn, noteOff }) {
+export default function Keys ({ noteStates, noteOn, noteOff, lowestNote = 21 }) {
     return <div id="keys">
         {
-            range(96).map(i => (
-                <button
-                    key={i}
-                    className={`key ${Synth.isSharp(i) ? "sharp" : "key"} ${noteStates.includes(i) ? "on" : "off"}`}
-                    onPointerDown={() => noteOn(i)}
-                    onPointerUp={() => noteOff(i)}
-                    onPointerEnter={e => e.buttons & 1 && noteOn(i)}
-                    onPointerLeave={() => noteOff(i)}
-                >
-                    {Synth.getNoteName(i)}
-                </button>
-            ))
+            range(96).map(i => {
+                const note = i + lowestNote;
+
+                return (
+                    <button
+                        key={note}
+                        className={`key ${Synth.isSharp(note) ? "sharp" : "key"} ${noteStates.includes(note) ? "on" : "off"}`}
+                        onPointerDown={() => noteOn(note)}
+                        onPointerUp={() => noteOff(note)}
+                        onPointerEnter={e => e.buttons & 1 && noteOn(note)}
+                        onPointerLeave={() => noteOff(note)}
+                    >
+                        {Synth.getNoteName(note)}
+                    </button>
+                );
+            })
         }
     </div>
 }
