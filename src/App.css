@@ -25,6 +25,7 @@ canvas {
   overflow-x: auto;
   white-space: nowrap;
   position: relative;
+  padding-bottom: 6px;
 }
 .key {
   height: 100px;
@@ -34,6 +35,7 @@ canvas {
   border-radius: 3px;
   font-size: small;
   padding: 0;
+  position: relative;
 }
 .key.sharp {
   background-color: black;
@@ -41,9 +43,23 @@ canvas {
   height: 33px;
   position: absolute;
   margin-left: -12.5px;
+  z-index: 1;
 }
 .key.on {
   background-color: #888;
+}
+.MappedKey {
+  position: absolute;
+  left: 4px;
+  bottom: -6px;
+  color: #ccc;
+  border-radius: 3px;
+  padding: 0 4px;
+  background-color: rgb(64 128 128);
+}
+.sharp .MappedKey {
+  /* color: white;
+  background-color: rgb(64 128 128); */
 }
 #fourier-coef {
   overflow: hidden;

@@ -1,11 +1,13 @@
 import React from 'react';
 import Synth from './synth';
 
-export default function Keys ({ noteStates, noteOn, noteOff, lowestNote = 21 }) {
+export default function Keys ({ noteStates, noteOn, noteOff, lowestNote = 21, keyMap = null }) {
     return <div id="keys">
         {
             range(96).map(i => {
                 const note = i + lowestNote;
+
+                const mappedKey = keyMap && keyMap[note];
 
                 return (
                     <button
@@ -17,6 +19,7 @@ export default function Keys ({ noteStates, noteOn, noteOff, lowestNote = 21 }) 
                         onPointerLeave={() => noteOff(note)}
                     >
                         {Synth.getNoteName(note)}
+                        { mappedKey && <span className="MappedKey">{mappedKey}</span> }
                     </button>
                 );
             })

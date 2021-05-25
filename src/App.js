@@ -5,6 +5,7 @@ import Staff from './Staff';
 import synth from './synth';
 
 const keyMap = '`1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./';
+const KEYBOARD_START = 48;
 // const dvorakMap = '1234567890[]\',.pyfgcrl/=aoeuidhtns-\\\\;qjkxbmwvz';
 
 function mapKeyEventToNote (e) {
@@ -14,7 +15,7 @@ function mapKeyEventToNote (e) {
         return -1;
     };
 
-    return index + 48;
+    return index + KEYBOARD_START;
 }
 
 class App extends React.Component {
@@ -26,6 +27,7 @@ class App extends React.Component {
             melody: [],
             isRecording: false,
             midiDevices: { inputs: [], outputs: [] },
+            showKeyMap: false,
         };
 
         this.noteOn = this.noteOn.bind(this);
@@ -169,13 +171,23 @@ class App extends React.Component {
     }
 
     render () {
-        const { melody, isRecording, midiDevices } = this.state;
+        const { melody, isRecording, midiDevices, showKeyMap } = this.state;
         const { noteStates } = synth;
+
+        const keyMapIndexed = showKeyMap ?
+            // eslint-disable-next-line
+            [...keyMap].reduce((o,c,i) => (o[i + KEYBOARD_START] = c, o), {})
+            :
+            null;
 
         return (
             <div className="App">
-                <Keys noteStates={noteStates} noteOn={this.noteOn} noteOff={this.noteOff} lowestNote={21} />
+                <Keys noteStates={noteStates} noteOn={this.noteOn} noteOff={this.noteOff} lowestNote={21} keyMap={keyMapIndexed} />
                 <input type="number" value={this.state.instrument} onChange={e => this.setState({ instrument: e.target.value })} />
+                <label>
+                    <input type="checkbox" checked={showKeyMap} onChange={e => this.setState({ showKeyMap: e.target.checked })} />
+                    Show Key Map
+                </label>
                 <div>
                     <button onClick={this.handleRecordingButton}>{ isRecording ? "Stop" : "Record" }</button>
                     <button onClick={this.handlePlayButton} disabled={this.state.melody.length === 0}>Play</button>
