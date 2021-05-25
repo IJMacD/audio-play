@@ -7,6 +7,7 @@ import synth from './synth';
 const keyMap = '`1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./';
 const KEYBOARD_START = 48;
 // const dvorakMap = '1234567890[]\',.pyfgcrl/=aoeuidhtns-\\\\;qjkxbmwvz';
+const SAVED_STATE_KEY = "AUDIO_PLAY_STATE";
 
 function mapKeyEventToNote (e) {
     const index = e.key === "#" ? 25 : keyMap.indexOf(e.key.toLowerCase());
@@ -28,6 +29,7 @@ class App extends React.Component {
             isRecording: false,
             midiDevices: { inputs: [], outputs: [] },
             showKeyMap: false,
+            ...getSavedState(SAVED_STATE_KEY),
         };
 
         this.noteOn = this.noteOn.bind(this);
@@ -161,13 +163,19 @@ class App extends React.Component {
         });
     }
 
+    componentDidUpdate () {
+        const { instrument, showKeyMap } = this.state;
+
+        setSavedState(SAVED_STATE_KEY, { instrument, showKeyMap });
+    }
+
     componentWillUnmount () {
         document.removeEventListener('keydown', this.handleKeyDown);
         document.removeEventListener('keyup', this.handleKeyUp);
         document.removeEventListener('keypress', this.handleKeyPress);
         synth.removeListener(this.handleSynthNote);
 
-        this.midiAccess.removeEventListener("statechange", this.midiStateCallback);
+        this.midiAccess && this.midiAccess.removeEventListener("statechange", this.midiStateCallback);
     }
 
     render () {
@@ -233,3 +241,19 @@ function parseMidiEvent (bytes) {
 
 const MIDI_NOTE_ON = 0x90;
 const MIDI_NOTE_OFF = 0x80;
+
+function getSavedState (key) {
+    const saved = localStorage.getItem(key);
+
+    if (saved) {
+        try {
+            return JSON.parse(saved);
+        } catch (e) {}
+    }
+
+    return {};
+}
+
+function setSavedState (key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+}
