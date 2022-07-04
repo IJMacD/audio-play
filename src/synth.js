@@ -1,3 +1,9 @@
+/**
+ * @typedef MelodyNote
+ * @prop {number} note
+ * @prop {number} count
+ */
+
 const concertPitch = 440; // Note 69, A4, 440 Hz
 const concertPitchNum = 68; // (0 index)
 const sharps = [false, true, false, true, false, false, true, false, true, false, true, false];
@@ -40,6 +46,12 @@ const synth = {
         this.destination.connect(this.nextDestination);
     },
 
+    /**
+   * @param {number} program
+   * @param {number} num
+   * @param {number | undefined} [when]
+   * @param {number} [gain]
+   */
     noteOn (program, num, when, gain=1) {
 
         if (!audioCtx) {
@@ -64,6 +76,10 @@ const synth = {
         }
     },
 
+    /**
+     * @param {number} num
+     * @param {number | undefined} [when]
+     */
     noteOff (num, when) {
         if (noteMap[num]) {
             noteMap[num].stop(when);
@@ -73,6 +89,10 @@ const synth = {
         }
     },
 
+    /**
+     * @param {number} value
+     * @param {number} when
+     */
     setVolume (value, when) {
         if (this.destination) {
             if (typeof when === "undefined") {
@@ -116,7 +136,10 @@ const synth = {
         };
     },
 
-    /** @static */
+    /**
+     * @static
+     * @param {number} num
+     */
     getNoteName (num) {
         const mod = num % 12;
         const alpha = 'CCDDEFFGGAAB'[mod];
@@ -125,7 +148,10 @@ const synth = {
         return alpha + sharp + octave;
     },
 
-    /** @static */
+    /**
+     * @static
+     * @param {number} num
+     */
     isSharp (num) {
         return sharps[num % 12];
     },
@@ -139,14 +165,21 @@ const synth = {
       noteListeners.splice(index, 1);
     },
 
-    playTune (notes) {
-      const now = audioCtx.currentTime;
-      const delta = 0.25;
+    /**
+     * @param {MelodyNote[]} notes
+     */
+    playTune (notes, tempo = 120) {
+      if (!audioCtx) {
+        this.initCtx();
+      }
 
-      notes.forEach((note, i) => {
-        this.noteOn(203, note, now + i * delta);
-        this.noteOff(note, now + (i + 1) * delta);
-      });
+      let now = audioCtx.currentTime;
+
+      for (const note of notes) {
+        this.noteOn(203, note.note, now);
+        now += note.count * 60 / tempo;
+        this.noteOff(note.note, now);
+      }
     },
 
     getInstrumentList () {

@@ -25,10 +25,11 @@ class App extends React.Component {
 
         this.state = {
             instrument: 303,
-            melody: [],
+            melody: /** @type {import('./synth').MelodyNote[]} */([]),
             isRecording: false,
             midiDevices: { inputs: [], outputs: [] },
             showKeyMap: false,
+            tempo: 120,
             ...getSavedState(SAVED_STATE_KEY),
         };
 
@@ -40,22 +41,32 @@ class App extends React.Component {
         this.handleSynthNote = () => this.forceUpdate();
         this.handleRecordingButton = this.handleRecordingButton.bind(this);
         this.handlePlayButton = this.handlePlayButton.bind(this);
+        this.handleMelodyClick = this.handleMelodyClick.bind(this);
 
         this.activeInputs = [];
     }
 
+    /**
+     * @param {number} note
+     */
     noteOn (note) {
         synth.noteOn(this.state.instrument, note);
 
         if (this.state.isRecording) {
-            this.setState({ melody: [ ...this.state.melody, note ] });
+            this.setState({ melody: [ ...this.state.melody, { note, count: 1 } ] });
         }
     }
 
+    /**
+     * @param {number} note
+     */
     noteOff (note) {
         synth.noteOff(note);
     }
 
+    /**
+     * @param {KeyboardEvent|import("react").MouseEvent} e
+     */
     handleRecordingButton (e) {
         const { isRecording } = this.state;
         const melody = isRecording || e.shiftKey ? this.state.melody : [];
@@ -64,7 +75,7 @@ class App extends React.Component {
 
     handlePlayButton () {
         this.setState({ isRecording: false });
-        synth.playTune(this.state.melody);
+        synth.playTune(this.state.melody, this.state.tempo);
     }
 
     /**
@@ -79,7 +90,14 @@ class App extends React.Component {
         }
     }
 
+    /**
+     * @param {KeyboardEvent} e
+     */
     handleKeyDown (e) {
+        if (e.target instanceof HTMLInputElement) {
+            return;
+        }
+
         if (e.key === "ArrowUp") {
             this.previousInstrument();
         } else if (e.key === "ArrowDown") {
@@ -130,6 +148,26 @@ class App extends React.Component {
         }
     }
 
+    /**
+     * @param {number} index
+     * @param {import('react').MouseEvent} e
+     */
+    handleMelodyClick (index, e) {
+        this.setState(({ melody: oldMelody }) =>
+            ({
+                melody: oldMelody.map((/** @type {import('./synth').MelodyNote} */ n, /** @type {number} */ i) => {
+                    if (i === index) {
+                        let { note, count } = n;
+                        count /= 2;
+                        if (count < 0.25) count = 4;
+                        return { note, count };
+                    }
+                    return n;
+                })
+            })
+        );
+    }
+
     componentDidMount () {
         document.addEventListener('keydown', this.handleKeyDown);
         document.addEventListener('keyup', this.handleKeyUp);
@@ -164,9 +202,9 @@ class App extends React.Component {
     }
 
     componentDidUpdate () {
-        const { instrument, showKeyMap } = this.state;
+        const { instrument, showKeyMap, melody, tempo } = this.state;
 
-        setSavedState(SAVED_STATE_KEY, { instrument, showKeyMap });
+        setSavedState(SAVED_STATE_KEY, { instrument, showKeyMap, melody, tempo });
     }
 
     componentWillUnmount () {
@@ -179,7 +217,7 @@ class App extends React.Component {
     }
 
     render () {
-        const { melody, isRecording, midiDevices, showKeyMap } = this.state;
+        const { melody, isRecording, midiDevices, showKeyMap, tempo } = this.state;
         const { noteStates } = synth;
 
         const keyMapIndexed = showKeyMap ?
@@ -199,7 +237,11 @@ class App extends React.Component {
                 <div>
                     <button onClick={this.handleRecordingButton}>{ isRecording ? "Stop" : "Record" }</button>
                     <button onClick={this.handlePlayButton} disabled={this.state.melody.length === 0}>Play</button>
-                    <Staff notes={melody} />
+                    <label>
+                        Tempo
+                        <input type="number" value={tempo} onChange={e => { e.stopPropagation(); this.setState({ tempo: +e.target.value }); }} />
+                    </label>
+                    <Staff notes={melody} onNoteClick={this.handleMelodyClick} />
                 </div>
                 <div>
                     <h2>Available MIDI devices</h2>
