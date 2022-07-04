@@ -8,6 +8,7 @@ const keyMap = '`1234567890-=qwertyuiop[]\\asdfghjkl;\'zxcvbnm,./';
 const KEYBOARD_START = 48;
 // const dvorakMap = '1234567890[]\',.pyfgcrl/=aoeuidhtns-\\\\;qjkxbmwvz';
 const SAVED_STATE_KEY = "AUDIO_PLAY_STATE";
+const HIFI = false;
 
 function mapKeyEventToNote (e) {
     const index = e.key === "#" ? 25 : keyMap.indexOf(e.key.toLowerCase());
@@ -30,6 +31,7 @@ class App extends React.Component {
             midiDevices: { inputs: [], outputs: [] },
             showKeyMap: false,
             tempo: 120,
+            currentMelodyIndex: -1,
             ...getSavedState(SAVED_STATE_KEY),
         };
 
@@ -65,6 +67,25 @@ class App extends React.Component {
     }
 
     /**
+     * @param {import('./synth').MelodyNote[]} melody
+     * @param {number} tempo
+     */
+    playTune (melody, tempo) {
+        let now = 0.1; // tenth of a second delay to give JS a chance
+        let index = 0;
+        for (const n of melody) {
+            const i = index++;
+            setTimeout(() => {
+                this.noteOn(n.note);
+                this.setState({ currentMelodyIndex: i });
+            }, now * 1000);
+            now += n.count * 60 / tempo;
+            setTimeout(() => this.noteOff(n.note), now * 1000);
+        }
+        setTimeout(() => this.setState({ currentMelodyIndex: -1 }), now * 1000);
+    }
+
+    /**
      * @param {KeyboardEvent|import("react").MouseEvent} e
      */
     handleRecordingButton (e) {
@@ -75,7 +96,16 @@ class App extends React.Component {
 
     handlePlayButton () {
         this.setState({ isRecording: false });
-        synth.playTune(this.state.melody, this.state.tempo);
+        if (HIFI) {
+            // Could offload to synth to handle playback
+            // (beter note timing)
+            synth.playTune(this.state.melody, this.state.tempo);
+        }
+        else {
+            // or use our own setTimeout based implementation
+            // (visual feedback)
+            this.playTune(this.state.melody, this.state.tempo);
+        }
     }
 
     /**
@@ -217,7 +247,7 @@ class App extends React.Component {
     }
 
     render () {
-        const { melody, isRecording, midiDevices, showKeyMap, tempo } = this.state;
+        const { melody, isRecording, midiDevices, showKeyMap, tempo, currentMelodyIndex } = this.state;
         const { noteStates } = synth;
 
         const keyMapIndexed = showKeyMap ?
@@ -241,7 +271,7 @@ class App extends React.Component {
                         Tempo
                         <input type="number" value={tempo} onChange={e => { e.stopPropagation(); this.setState({ tempo: +e.target.value }); }} />
                     </label>
-                    <Staff notes={melody} onNoteClick={this.handleMelodyClick} />
+                    <Staff notes={melody} onNoteClick={this.handleMelodyClick} selectedIndex={currentMelodyIndex} />
                 </div>
                 <div>
                     <h2>Available MIDI devices</h2>

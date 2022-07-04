@@ -14,9 +14,10 @@ const NOTES = {
  * @param {object} props
  * @param {import('./synth').MelodyNote[]} props.notes
  * @param {(index: number, e: import('react').MouseEvent) => void} [props.onNoteClick]
+ * @param {number} [props.selectedIndex]
  * @returns
  */
-export default function Staff ({ notes, onNoteClick }) {
+export default function Staff ({ notes, onNoteClick, selectedIndex }) {
     const scale = 5; // CSS pixels
 
     const staffParts = [];
@@ -33,6 +34,7 @@ export default function Staff ({ notes, onNoteClick }) {
                 title: synth.getNoteName(n.note),
                 bottom: offset * scale,
                 symbol: NOTES[n.count],
+                selected: i === selectedIndex,
                 index: i++,
             });
 
@@ -53,7 +55,7 @@ export default function Staff ({ notes, onNoteClick }) {
                         key={i}
                         title={part.title}
                         className="Staff-note"
-                        style={{ bottom: part.bottom }}
+                        style={{ bottom: part.bottom, color: part.selected ? "red" : void 0 }}
                         onClick={e => onNoteClick?.(part.index??-1, e)}
                     >
                         {part.symbol}
