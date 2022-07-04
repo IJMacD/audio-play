@@ -1,6 +1,9 @@
 body {
   font-family: sans-serif;
 }
+.App {
+  padding: 1em;
+}
 .comp {
   border: 1px solid #888;
   margin: 4px 2px;

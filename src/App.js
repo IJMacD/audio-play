@@ -1,5 +1,6 @@
 import React from 'react';
 import './App.css';
+import gmn from './gmn';
 import Keys from './Keys';
 import Staff from './Staff';
 import synth from './synth';
@@ -24,14 +25,18 @@ class App extends React.Component {
     constructor (props) {
         super(props);
 
+        /**
+         * @type {{ instrument: number, melody: import('./synth').MelodyNote[], isRecording: boolean, midiDevices: { inputs: MIDIInput[], outputs: MIDIOutput[] }, showKeyMap: boolean, tempo: number, currentMelodyIndex: number, gmnText: string }}
+         */
         this.state = {
             instrument: 303,
-            melody: /** @type {import('./synth').MelodyNote[]} */([]),
+            melody: [],
             isRecording: false,
             midiDevices: { inputs: [], outputs: [] },
             showKeyMap: false,
             tempo: 120,
             currentMelodyIndex: -1,
+            gmnText: "",
             ...getSavedState(SAVED_STATE_KEY),
         };
 
@@ -44,6 +49,7 @@ class App extends React.Component {
         this.handleRecordingButton = this.handleRecordingButton.bind(this);
         this.handlePlayButton = this.handlePlayButton.bind(this);
         this.handleMelodyClick = this.handleMelodyClick.bind(this);
+        this.handleGMNTextChange = this.handleGMNTextChange.bind(this);
 
         this.activeInputs = [];
     }
@@ -53,6 +59,10 @@ class App extends React.Component {
      */
     noteOn (note) {
         synth.noteOn(this.state.instrument, note);
+
+        for (const output of this.state.midiDevices.outputs) {
+            output.send(makeMidiMessage(MIDI_NOTE_ON, 1, note, 100))
+        }
 
         if (this.state.isRecording) {
             this.setState({ melody: [ ...this.state.melody, { note, count: 1 } ] });
@@ -64,6 +74,10 @@ class App extends React.Component {
      */
     noteOff (note) {
         synth.noteOff(note);
+
+        for (const output of this.state.midiDevices.outputs) {
+            output.send(makeMidiMessage(MIDI_NOTE_OFF, 1, note))
+        }
     }
 
     /**
@@ -113,6 +127,12 @@ class App extends React.Component {
      * @param {KeyboardEvent} e
      */
     handleKeyPress (e) {
+        if (e.target instanceof HTMLInputElement ||
+            e.target instanceof HTMLTextAreaElement)
+        {
+            return;
+        }
+
         if (e.key === "Enter") {
             this.handleRecordingButton(e);
         } else if (e.key === " ") {
@@ -124,7 +144,9 @@ class App extends React.Component {
      * @param {KeyboardEvent} e
      */
     handleKeyDown (e) {
-        if (e.target instanceof HTMLInputElement) {
+        if (e.target instanceof HTMLInputElement ||
+            e.target instanceof HTMLTextAreaElement)
+        {
             return;
         }
 
@@ -198,6 +220,20 @@ class App extends React.Component {
         );
     }
 
+    /**
+     *
+     * @param {import("react").ChangeEvent<HTMLTextAreaElement>} e
+     */
+    handleGMNTextChange (e) {
+        const gmnText = e.target.value;
+        this.setState({ gmnText });
+
+        const melody = gmn.parse(gmnText);
+        if (melody) {
+            this.setState({ melody });
+        }
+    }
+
     componentDidMount () {
         document.addEventListener('keydown', this.handleKeyDown);
         document.addEventListener('keyup', this.handleKeyUp);
@@ -208,6 +244,7 @@ class App extends React.Component {
         navigator.requestMIDIAccess().then(access => {
             const updateDevices = () => {
                 const inputs = [...access.inputs.values()];
+                const outputs = [...access.outputs.values()];
 
                 for (const input of inputs) {
                     if (!this.activeInputs.includes(input.id)) {
@@ -216,7 +253,7 @@ class App extends React.Component {
                     }
                 }
 
-                this.setState({ midiDevices: { inputs, outputs: [...access.outputs.values()] }});
+                this.setState({ midiDevices: { inputs, outputs }});
             };
 
             updateDevices();
@@ -232,9 +269,9 @@ class App extends React.Component {
     }
 
     componentDidUpdate () {
-        const { instrument, showKeyMap, melody, tempo } = this.state;
+        const { instrument, showKeyMap, melody, tempo, gmnText } = this.state;
 
-        setSavedState(SAVED_STATE_KEY, { instrument, showKeyMap, melody, tempo });
+        setSavedState(SAVED_STATE_KEY, { instrument, showKeyMap, melody, tempo, gmnText });
     }
 
     componentWillUnmount () {
@@ -272,6 +309,9 @@ class App extends React.Component {
                         <input type="number" value={tempo} onChange={e => { e.stopPropagation(); this.setState({ tempo: +e.target.value }); }} />
                     </label>
                     <Staff notes={melody} onNoteClick={this.handleMelodyClick} selectedIndex={currentMelodyIndex} />
+                </div>
+                <div>
+                    <textarea value={this.state.gmnText} onChange={this.handleGMNTextChange} style={{width: 500, height: 180}} />
                 </div>
                 <div>
                     <h2>Available MIDI devices</h2>
@@ -313,6 +353,10 @@ function parseMidiEvent (bytes) {
 
 const MIDI_NOTE_ON = 0x90;
 const MIDI_NOTE_OFF = 0x80;
+
+function makeMidiMessage (type, channel, note, velocity = 0) {
+    return [ type | channel, note, velocity ];
+}
 
 function getSavedState (key) {
     const saved = localStorage.getItem(key);
