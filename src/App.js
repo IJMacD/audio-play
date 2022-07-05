@@ -21,12 +21,26 @@ function mapKeyEventToNote (e) {
     return index + KEYBOARD_START;
 }
 
+/**
+ * @typedef AppState
+ * @prop {number} instrument
+ * @prop {import('./synth').MelodyNote[]} melody
+ * @prop {boolean} isRecording
+ * @prop {{ inputs: MIDIInput[]; outputs: MIDIOutput[] }} midiDevices
+ * @prop {boolean} showKeyMap
+ * @prop {number} tempo
+ * @prop {number} currentMelodyIndex
+ * @prop {string} gmnText
+ * @prop {boolean} keyboardEnabled
+ * @prop {boolean} synthEnabled
+ */
+
 class App extends React.Component {
     constructor (props) {
         super(props);
 
         /**
-         * @type {{ instrument: number, melody: import('./synth').MelodyNote[], isRecording: boolean, midiDevices: { inputs: MIDIInput[], outputs: MIDIOutput[] }, showKeyMap: boolean, tempo: number, currentMelodyIndex: number, gmnText: string }}
+         * @type {AppState}
          */
         this.state = {
             instrument: 303,
@@ -37,6 +51,8 @@ class App extends React.Component {
             tempo: 120,
             currentMelodyIndex: -1,
             gmnText: "",
+            keyboardEnabled: true,
+            synthEnabled: true,
             ...getSavedState(SAVED_STATE_KEY),
         };
 
@@ -58,7 +74,9 @@ class App extends React.Component {
      * @param {number} note
      */
     noteOn (note) {
-        synth.noteOn(this.state.instrument, note);
+        if (this.state.synthEnabled) {
+            synth.noteOn(this.state.instrument, note);
+        }
 
         for (const output of this.state.midiDevices.outputs) {
             output.send(makeMidiMessage(MIDI_NOTE_ON, 1, note, 100))
@@ -154,7 +172,7 @@ class App extends React.Component {
             this.previousInstrument();
         } else if (e.key === "ArrowDown") {
             this.nextInstrument();
-        } else {
+        } else if (this.state.keyboardEnabled) {
 
             const note = mapKeyEventToNote(e);
 
@@ -248,7 +266,12 @@ class App extends React.Component {
 
                 for (const input of inputs) {
                     if (!this.activeInputs.includes(input.id)) {
-                        input.addEventListener("midimessage", e => this.handleMidiEvent(parseMidiEvent(e.data)));
+                        input.addEventListener("midimessage",
+                            e => this.handleMidiEvent(
+                                // @ts-ignore
+                                parseMidiEvent(e.data)
+                            )
+                        );
                         this.activeInputs.push(input.id);
                     }
                 }
@@ -280,7 +303,8 @@ class App extends React.Component {
         document.removeEventListener('keypress', this.handleKeyPress);
         synth.removeListener(this.handleSynthNote);
 
-        this.midiAccess && this.midiAccess.removeEventListener("statechange", this.midiStateCallback);
+        this.midiAccess && this.midiStateCallback &&
+            this.midiAccess.removeEventListener("statechange", this.midiStateCallback);
     }
 
     render () {
@@ -291,7 +315,7 @@ class App extends React.Component {
             // eslint-disable-next-line
             [...keyMap].reduce((o,c,i) => (o[i + KEYBOARD_START] = c, o), {})
             :
-            null;
+            undefined;
 
         return (
             <div className="App">
@@ -314,17 +338,19 @@ class App extends React.Component {
                     <textarea value={this.state.gmnText} onChange={this.handleGMNTextChange} style={{width: 500, height: 180}} />
                 </div>
                 <div>
-                    <h2>Available MIDI devices</h2>
+                    <h2>Available devices</h2>
                     <h3>Inputs</h3>
                     <ul>
+                        <li><label><input type="checkbox" checked={this.state.keyboardEnabled} onChange={e => this.setState({ keyboardEnabled: e.target.checked })} /> Keyboard</label></li>
                         {
                             midiDevices.inputs.map(d => <li key={d.id}><input type="checkbox" checked={this.activeInputs.includes(d.id)} readOnly /> {d.manufacturer} {d.name}</li>)
                         }
                     </ul>
                     <h3>Outputs</h3>
                     <ul>
+                        <li><label><input type="checkbox" checked={this.state.synthEnabled} onChange={e => this.setState({ synthEnabled: e.target.checked })} /> Synth</label></li>
                         {
-                            midiDevices.outputs.map(d => <li key={d.id}>{d.manufacturer} {d.name}</li>)
+                            midiDevices.outputs.map(d => <li key={d.id}><input type="checkbox" checked readOnly /> {d.manufacturer} {d.name}</li>)
                         }
                     </ul>
                 </div>

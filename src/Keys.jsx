@@ -1,7 +1,7 @@
 import React from 'react';
 import Synth from './synth';
 
-export default function Keys ({ noteStates, noteOn, noteOff, lowestNote = 21, keyMap = null }) {
+export default function Keys ({ noteStates, noteOn, noteOff, lowestNote = 21, keyMap = {} }) {
     return <div id="keys">
         {
             range(96).map(i => {
