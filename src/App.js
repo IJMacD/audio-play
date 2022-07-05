@@ -33,6 +33,7 @@ function mapKeyEventToNote (e) {
  * @prop {string} gmnText
  * @prop {boolean} keyboardEnabled
  * @prop {boolean} synthEnabled
+ * @prop {[number,number]} timeSignature
  */
 
 class App extends React.Component {
@@ -246,9 +247,10 @@ class App extends React.Component {
         const gmnText = e.target.value;
         this.setState({ gmnText });
 
-        const melody = gmn.parse(gmnText);
-        if (melody) {
-            this.setState({ melody });
+        const result = gmn.parse(gmnText);
+        if (result) {
+            const { melody, timeSignature } = result;
+            this.setState({ melody, timeSignature });
         }
     }
 
@@ -292,9 +294,9 @@ class App extends React.Component {
     }
 
     componentDidUpdate () {
-        const { instrument, showKeyMap, melody, tempo, gmnText } = this.state;
+        const { instrument, showKeyMap, melody, tempo, gmnText, timeSignature } = this.state;
 
-        setSavedState(SAVED_STATE_KEY, { instrument, showKeyMap, melody, tempo, gmnText });
+        setSavedState(SAVED_STATE_KEY, { instrument, showKeyMap, melody, tempo, gmnText, timeSignature });
     }
 
     componentWillUnmount () {
@@ -332,7 +334,7 @@ class App extends React.Component {
                         Tempo
                         <input type="number" value={tempo} onChange={e => { e.stopPropagation(); this.setState({ tempo: +e.target.value }); }} />
                     </label>
-                    <Staff notes={melody} onNoteClick={this.handleMelodyClick} selectedIndex={currentMelodyIndex} />
+                    <Staff notes={melody} timeSignature={this.state.timeSignature} onNoteClick={this.handleMelodyClick} selectedIndex={currentMelodyIndex} />
                 </div>
                 <div>
                     <textarea value={this.state.gmnText} onChange={this.handleGMNTextChange} style={{width: 500, height: 180}} />

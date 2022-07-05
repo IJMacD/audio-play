@@ -13,11 +13,12 @@ const NOTES = {
  *
  * @param {object} props
  * @param {import('./synth').MelodyNote[]} props.notes
+ * @param {[number,number]} [props.timeSignature]
  * @param {(index: number, e: import('react').MouseEvent) => void} [props.onNoteClick]
  * @param {number} [props.selectedIndex]
  * @returns
  */
-export default function Staff ({ notes, onNoteClick, selectedIndex }) {
+export default function Staff ({ notes, timeSignature, onNoteClick, selectedIndex }) {
     const scale = 5; // CSS pixels
 
     const staffParts = [];
@@ -29,19 +30,36 @@ export default function Staff ({ notes, onNoteClick, selectedIndex }) {
         const offset = getNoteStaffOffset(n.note);
 
         if (offset >= -3 && offset <= 12) {
+            let symbol = NOTES[n.count];
+
+            if (!symbol) {
+                symbol = NOTES[n.count / 1.5];
+
+                if (symbol) {
+                    symbol += "\u200d\u{1d16d}";
+                }
+                else {
+                    symbol = "𝅆";
+                }
+            }
+
+            if (synth.isSharp(n.note)) {
+                symbol = <><span className='Staff-Accidental'>♯</span>{symbol}</>;
+            }
+
             staffParts.push({
                 type: "note",
                 title: synth.getNoteName(n.note),
                 bottom: offset * scale,
-                symbol: NOTES[n.count],
+                symbol,
                 selected: i === selectedIndex,
                 index: i++,
             });
 
             count += n.count;
 
-            if (count % 4 === 0) {
-                staffParts.push({ type: "bar" });
+            if (timeSignature && count / 4 * timeSignature[1] % timeSignature[0] === 0) {
+                staffParts.push({ type: "bar", symbol: i === notes.length ? "𝄂" : "𝄀" });
             }
         }
     }
@@ -49,12 +67,15 @@ export default function Staff ({ notes, onNoteClick, selectedIndex }) {
     return (
         <p className="Staff">
             𝄞
+            {
+                timeSignature && <span className='Staff-TimeSignature'><sup>{timeSignature[0]}</sup><br/><sub>{timeSignature[1]}</sub></span>
+            }
             { staffParts.map((part,i) => {
                 if (part.type === "note") {
                     return <span
                         key={i}
-                        title={part.title}
                         className="Staff-note"
+                        title={part.title}
                         style={{ bottom: part.bottom, color: part.selected ? "red" : void 0 }}
                         onClick={e => onNoteClick?.(part.index??-1, e)}
                     >
@@ -66,7 +87,7 @@ export default function Staff ({ notes, onNoteClick, selectedIndex }) {
                         key={i}
                         className="Staff-bar"
                     >
-                        𝄀
+                        {part.symbol}{' '}
                     </span>
 
                 }

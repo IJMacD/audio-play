@@ -70,12 +70,33 @@ canvas {
 }
 .Staff {
   font-size: 50px;
-  height: 60px;
   background-image: linear-gradient(0deg, transparent, transparent 9px, black 9px, black 10px, transparent 10px, transparent 19px, black 19px, black 20px, transparent 20px, transparent 29px, black 29px, black 30px, transparent 30px, transparent 39px, black 39px, black 40px, transparent 40px, transparent 49px, black 49px, black 50px, transparent 50px, transparent);
-  background-position-y: 4px;
+  background-position-y: -7px;
   border-bottom: 1px solid rgba(128,256,256,0.5);
+  background-repeat: repeat;
+  background-size: 100px 70px;
+  line-height: 70px;
 }
 .Staff-note {
   position: relative;
   margin: 0 5px;
+}
+.Staff-TimeSignature {
+  font-size: 30px;
+  line-height: 20px;
+  vertical-align: baseline;
+  display: inline-block;
+  font-family: 'Georgia Pro', Georgia, 'DejaVu Serif', Times, 'Times New Roman', FreeSerif, 'DejaVu Math TeX', 'URW Bookman L', serif;
+  font-weight: bold;
+}
+.Staff-TimeSignature sub,
+.Staff-TimeSignature sup
+{
+  vertical-align: baseline;
+}
+.Staff-Accidental {
+  font-size: 0.5em;
+  vertical-align: bottom;
+  position: relative;
+  top: 0.5em;
 }
