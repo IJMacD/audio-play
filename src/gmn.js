@@ -1,5 +1,4 @@
-const noteRe = /([a-g])(#|&)?(-?\d)?(?:\/(\d{1,2}))?(\.*)/i;
-const tsRe = /\\meter<"(\d)\/(\d)">/
+const keyRe = /\\key<(-?\d)>/
 
 const NOTE_INDEX = "ccddeffggaab";
 
@@ -13,24 +12,36 @@ const NOTE_INDEX = "ccddeffggaab";
 //     b/4. b b/8 a/4 g/8 a/4 b/8 g/4. d. g g/8 g/4 a/8
 //     b/4. b b/8 a/4 g/8 a/4 b/8 g/2.
 // Example Ba Ba Black Sheep
-//     \meter<"2/4">
-//     d d a a b/8 c#2 d b1 a/2 g/4 g
-//     f# f# e e d/2 a/4 a/8 a g/4 g/8 g
-//     f#/4 f#/8 f# e/4 e a/4 a/8 a g a b g f#/4 e/8 e d/2
+//     \meter<"2/4"> \key<2>
+//     d d | a a | b/8 c#2 d b1 | a/2 | g/4 g |
+//     f# f# | e e | d/2 | a/4 a/8 a | g/4 g/8 g |
+//     f#/4 f#/8 f# | e/4 e | a/4 a/8 a | g a b g | f#/4 e/8 e | d/2 |
 
 const gmn = {
     /**
      * @param {string} input
-     * @returns {{ melody: import("./synth").MelodyNote[], timeSignature: [number,number]? }?}
+     * @returns {{ melody: import("./synth").MelodyNote[], timeSignature: [number,number]?, keySignature: number? }?}
      */
     parse (input) {
+        /** @type {[number,number]?} */
         let timeSignature = null;
+        let keySignature = null;
+
+        // Bars are accepted but ignored
+        input = input.replace(/\|/g, "");
 
         const tsMatch = tsRe.exec(input);
         if (tsMatch) {
-            /** @type {[number,number]} */
+
             timeSignature = [+tsMatch[1],+tsMatch[2]];
             input = input.replace(tsRe, "");
+        }
+
+        const keyMatch = keyRe.exec(input);
+        if (keyMatch) {
+            /** @type {[number,number]} */
+            keySignature = +keyMatch[1];
+            input = input.replace(keyRe, "");
         }
 
         const parts = input.trim().split(/\s+/);
@@ -79,7 +90,7 @@ const gmn = {
             melody.push({ note, count });
         }
 
-        return { melody, timeSignature };
+        return { melody, timeSignature, keySignature };
     }
 }
 

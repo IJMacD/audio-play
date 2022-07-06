@@ -9,19 +9,47 @@ const NOTES = {
     4: "𝅝",
 };
 
+
+const CIRCLE_OF_FIFTHS_SHARP = "fcgdaeb";
+const CIRCLE_OF_FIFTHS_FLAT = "beadgcf";
+
+const KEY_OFFSETS_SHARP = {
+    a: 0,
+    b: 1,
+    c: 2,
+    d: 3,
+    e: 4,
+    f: 5,
+    g: 6,
+};
+
+const KEY_OFFSETS_FLAT = {
+    a: 0,
+    b: 1,
+    c: 2,
+    d: 3,
+    e: 4,
+    f: -2,
+    g: -1,
+};
+
 /**
  *
  * @param {object} props
  * @param {import('./synth').MelodyNote[]} props.notes
  * @param {[number,number]} [props.timeSignature]
+ * @param {number} [props.keySignature]
  * @param {(index: number, e: import('react').MouseEvent) => void} [props.onNoteClick]
  * @param {number} [props.selectedIndex]
  * @returns
  */
-export default function Staff ({ notes, timeSignature, onNoteClick, selectedIndex }) {
-    const scale = 5; // CSS pixels
+export default function Staff ({ notes, timeSignature, keySignature, onNoteClick, selectedIndex }) {
+    const scale = 5; // CSS pixels; (CSS background 10px spacing)
 
     const staffParts = [];
+
+    const keySharps = keySignature && keySignature > 0 ? [...CIRCLE_OF_FIFTHS_SHARP.slice(0, keySignature)] : [];
+    const keyFlats = keySignature && keySignature < 0 ? [...CIRCLE_OF_FIFTHS_FLAT.slice(0, -keySignature)] : [];
 
     let count = 0;
     let i = 0;
@@ -43,8 +71,13 @@ export default function Staff ({ notes, timeSignature, onNoteClick, selectedInde
                 }
             }
 
-            if (synth.isSharp(n.note)) {
+            const noteName = synth.getNoteName(n.note)[0].toLowerCase();
+
+            if (synth.isSharp(n.note) && !keySharps.includes(noteName)) {
                 symbol = <><span className='Staff-Accidental'>♯</span>{symbol}</>;
+            }
+            else if (!synth.isSharp(n.note) && keySharps.includes(noteName)) {
+                symbol = <><span className='Staff-Accidental'>♮</span>{symbol}</>;
             }
 
             staffParts.push({
@@ -64,9 +97,18 @@ export default function Staff ({ notes, timeSignature, onNoteClick, selectedInde
         }
     }
 
+    const keySignatureMarkers =
+        [
+            ...keySharps.map(c => ({ bottom: KEY_OFFSETS_SHARP[c] * scale - 2, symbol: "♯" })),
+            ...keyFlats.map(c => ({ bottom: KEY_OFFSETS_FLAT[c] * scale + 1, symbol: "♭" })),
+        ];
+
     return (
         <p className="Staff">
             𝄞
+            {
+                keySignatureMarkers.map(marker => <span key={marker.bottom} className='Staff-KeySignature' style={{ bottom: marker.bottom }}>{marker.symbol}</span>)
+            }
             {
                 timeSignature && <span className='Staff-TimeSignature'><sup>{timeSignature[0]}</sup><br/><sub>{timeSignature[1]}</sub></span>
             }

@@ -81,6 +81,11 @@ canvas {
   position: relative;
   margin: 0 5px;
 }
+.Staff-KeySignature {
+  font-size: 0.5em;
+  vertical-align: bottom;
+  position: relative;
+}
 .Staff-TimeSignature {
   font-size: 30px;
   line-height: 20px;

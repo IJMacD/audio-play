@@ -34,6 +34,7 @@ function mapKeyEventToNote (e) {
  * @prop {boolean} keyboardEnabled
  * @prop {boolean} synthEnabled
  * @prop {[number,number]} timeSignature
+ * @prop {number} keySignature
  */
 
 class App extends React.Component {
@@ -249,8 +250,8 @@ class App extends React.Component {
 
         const result = gmn.parse(gmnText);
         if (result) {
-            const { melody, timeSignature } = result;
-            this.setState({ melody, timeSignature });
+            const { melody, timeSignature, keySignature } = result;
+            this.setState({ melody, timeSignature, keySignature });
         }
     }
 
@@ -334,7 +335,7 @@ class App extends React.Component {
                         Tempo
                         <input type="number" value={tempo} onChange={e => { e.stopPropagation(); this.setState({ tempo: +e.target.value }); }} />
                     </label>
-                    <Staff notes={melody} timeSignature={this.state.timeSignature} onNoteClick={this.handleMelodyClick} selectedIndex={currentMelodyIndex} />
+                    <Staff notes={melody} timeSignature={this.state.timeSignature} keySignature={this.state.keySignature} onNoteClick={this.handleMelodyClick} selectedIndex={currentMelodyIndex} />
                 </div>
                 <div>
                     <textarea value={this.state.gmnText} onChange={this.handleGMNTextChange} style={{width: 500, height: 180}} />
