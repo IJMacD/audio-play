@@ -9,6 +9,13 @@ const NOTES = {
     4: "𝅝",
 };
 
+const REST_SYMBOL = {
+    0.25: "𝄿",
+    0.5: "𝄾",
+    1: "𝄽",
+    2: "𝄼",
+    4: "𝄻",
+}
 
 const CIRCLE_OF_FIFTHS_SHARP = "fcgdaeb";
 const CIRCLE_OF_FIFTHS_FLAT = "beadgcf";
@@ -55,9 +62,20 @@ export default function Staff ({ notes, timeSignature, keySignature, onNoteClick
     let i = 0;
 
     for (const n of notes) {
-        const offset = getNoteStaffOffset(n.note);
+        if (n.note === synth.REST) {
+            staffParts.push({
+                type: "rest",
+                symbol: REST_SYMBOL[n.count],
+                selected: i === selectedIndex,
+                index: i++,
+            });
 
-        if (offset >= -3 && offset <= 12) {
+        }
+        else
+        {
+
+            const offset = getNoteStaffOffset(n.note);
+
             let symbol = NOTES[n.count];
 
             if (!symbol) {
@@ -88,12 +106,12 @@ export default function Staff ({ notes, timeSignature, keySignature, onNoteClick
                 selected: i === selectedIndex,
                 index: i++,
             });
+        }
 
-            count += n.count;
+        count += n.count;
 
-            if (timeSignature && count / 4 * timeSignature[1] % timeSignature[0] === 0) {
-                staffParts.push({ type: "bar", symbol: i === notes.length ? "𝄂" : "𝄀" });
-            }
+        if (timeSignature && count / 4 * timeSignature[1] % timeSignature[0] === 0) {
+            staffParts.push({ type: "bar", symbol: i === notes.length ? "𝄂 " : "𝄀 " });
         }
     }
 
@@ -113,26 +131,20 @@ export default function Staff ({ notes, timeSignature, keySignature, onNoteClick
                 timeSignature && <span className='Staff-TimeSignature'><sup>{timeSignature[0]}</sup><br/><sub>{timeSignature[1]}</sub></span>
             }
             { staffParts.map((part,i) => {
-                if (part.type === "note") {
-                    return <span
-                        key={i}
-                        className="Staff-note"
-                        title={part.title}
-                        style={{ bottom: part.bottom, color: part.selected ? "red" : void 0 }}
-                        onClick={e => onNoteClick?.(part.index??-1, e)}
-                    >
-                        {part.symbol}
-                    </span>
-                }
-                else if (part.type === "bar") {
-                    return <span
-                        key={i}
-                        className="Staff-bar"
-                    >
-                        {part.symbol}{' '}
-                    </span>
+                const { index, bottom } = part;
+                const onClick = typeof index === "number" && onNoteClick ?
+                    e => onNoteClick(index, e) :
+                    undefined;
 
-                }
+                return <span
+                    key={i}
+                    className={`Staff-${ucfirst(part.type)}`}
+                    title={part.title}
+                    style={{ bottom, color: part.selected ? "red" : void 0 }}
+                    onClick={onClick}
+                >
+                    {part.symbol}
+                </span>
             }) }
         </p>
     );
@@ -141,4 +153,11 @@ export default function Staff ({ notes, timeSignature, keySignature, onNoteClick
 const sharps = [0,0,1,1,2,3,3,4,4,5,5,6];
 function getNoteStaffOffset (note) {
     return Math.floor(note/12) * 7 + sharps[note%12] - 38;
+}
+
+/**
+ * @param {string} string
+ */
+function ucfirst (string) {
+    return string[0]?.toUpperCase() + string.substring(1);
 }

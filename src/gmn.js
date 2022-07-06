@@ -1,4 +1,9 @@
+import synth from "./synth";
+
+const noteRe = /([a-g])(#|&)?(-?\d+)?(?:\/(\d{1,2}))?(\.*)/i;
+const tsRe = /\\meter<"(\d+)\/(\d+)">/
 const keyRe = /\\key<(-?\d)>/
+const restRe = /_(?:\/(\d{1,2}))?(\.*)/i;
 
 const NOTE_INDEX = "ccddeffggaab";
 
@@ -54,6 +59,24 @@ const gmn = {
             const match = noteRe.exec(part);
 
             if (!match) {
+                const restMatch = restRe.exec(part);
+
+                if (restMatch) {
+                    if (restMatch[1]) {
+                        stickyDuration = +restMatch[1];
+                    }
+
+                    const multiplier = restMatch[2] === "." ? 1.5 : 1;
+
+                    const count = 4 / stickyDuration * multiplier;
+
+                    melody.push({ note: synth.REST, count });
+
+                    continue;
+                }
+
+                console.log(`[gmn] Unable to parse '${part}'`);
+
                 // Failed to parse whole string
                 return null;
             }

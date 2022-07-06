@@ -58,6 +58,10 @@ const synth = {
             this.initCtx();
         }
 
+        if (num === synth.REST) {
+          return;
+        }
+
         if (!noteMap[num]) {
 
             const freq = getNoteFreq(num);
@@ -199,6 +203,8 @@ const synth = {
 Object.defineProperty(synth, "currentTime", { get: () => audioCtx.currentTime });
 
 Object.defineProperty(synth, "noteStates", { get: () => Object.keys(noteMap).map(k => +k) });
+
+Object.defineProperty(synth, "REST", { get: () => -1 });
 
 export default synth;
 
