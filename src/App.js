@@ -73,30 +73,30 @@ class App extends React.Component {
     }
 
     /**
-     * @param {number} note
+     * @param {number} pitch
      */
-    noteOn (note) {
+    noteOn (pitch) {
         if (this.state.synthEnabled) {
-            synth.noteOn(this.state.instrument, note);
+            synth.noteOn(this.state.instrument, pitch);
         }
 
         for (const output of this.state.midiDevices.outputs) {
-            output.send(makeMidiMessage(MIDI_NOTE_ON, 1, note, 100))
+            output.send(makeMidiMessage(MIDI_NOTE_ON, 1, pitch, 100))
         }
 
         if (this.state.isRecording) {
-            this.setState({ melody: [ ...this.state.melody, { note, count: 1 } ] });
+            this.setState({ melody: [ ...this.state.melody, { pitch, count: 1 } ] });
         }
     }
 
     /**
-     * @param {number} note
+     * @param {number} pitch
      */
-    noteOff (note) {
-        synth.noteOff(note);
+    noteOff (pitch) {
+        synth.noteOff(pitch);
 
         for (const output of this.state.midiDevices.outputs) {
-            output.send(makeMidiMessage(MIDI_NOTE_OFF, 1, note))
+            output.send(makeMidiMessage(MIDI_NOTE_OFF, 1, pitch))
         }
     }
 
@@ -110,11 +110,11 @@ class App extends React.Component {
         for (const n of melody) {
             const i = index++;
             setTimeout(() => {
-                this.noteOn(n.note);
+                this.noteOn(n.pitch);
                 this.setState({ currentMelodyIndex: i });
             }, now * 1000);
             now += n.count * 60 / tempo;
-            setTimeout(() => this.noteOff(n.note), now * 1000);
+            setTimeout(() => this.noteOff(n.pitch), now * 1000);
         }
         setTimeout(() => this.setState({ currentMelodyIndex: -1 }), now * 1000);
     }
@@ -214,9 +214,9 @@ class App extends React.Component {
      */
     handleMidiEvent (event) {
         if (event.type === MIDI_NOTE_ON) {
-            this.noteOn(event.note);
+            this.noteOn(event.pitch);
         } else if (event.type === MIDI_NOTE_OFF) {
-            this.noteOff(event.note);
+            this.noteOff(event.pitch);
         }
     }
 
@@ -229,10 +229,10 @@ class App extends React.Component {
             ({
                 melody: oldMelody.map((/** @type {import('./synth').MelodyNote} */ n, /** @type {number} */ i) => {
                     if (i === index) {
-                        let { note, count } = n;
+                        let { pitch, count } = n;
                         count /= 2;
                         if (count < 0.25) count = 4;
-                        return { note, count };
+                        return { pitch, count };
                     }
                     return n;
                 })
@@ -365,7 +365,7 @@ class App extends React.Component {
 export default App;
 
 /**
- * @typedef {{type: number;channel: number;note: number;velocity: number;}} MIDIEvent
+ * @typedef {{type: number;channel: number;pitch: number;velocity: number;}} MIDIEvent
  */
 
 /**
@@ -373,11 +373,11 @@ export default App;
  * @param {Uint8Array} bytes
  * @returns {MIDIEvent} */
 function parseMidiEvent (bytes) {
-    const [ status, note, velocity ] = bytes;
+    const [ status, pitch, velocity ] = bytes;
     const type = status & 0xf0;
     const channel = status & 0x0f;
 
-    return { type, channel, note, velocity };
+    return { type, channel, pitch, velocity };
 }
 
 const MIDI_NOTE_ON = 0x90;

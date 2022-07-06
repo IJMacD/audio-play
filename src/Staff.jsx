@@ -62,7 +62,7 @@ export default function Staff ({ notes, timeSignature, keySignature, onNoteClick
     let i = 0;
 
     for (const n of notes) {
-        if (n.note === synth.REST) {
+        if (n.pitch === synth.REST) {
             staffParts.push({
                 type: "rest",
                 symbol: REST_SYMBOL[n.count],
@@ -74,7 +74,7 @@ export default function Staff ({ notes, timeSignature, keySignature, onNoteClick
         else
         {
 
-            const offset = getNoteStaffOffset(n.note);
+            const offset = getNoteStaffOffset(n.pitch);
 
             let symbol = NOTES[n.count];
 
@@ -89,18 +89,18 @@ export default function Staff ({ notes, timeSignature, keySignature, onNoteClick
                 }
             }
 
-            const noteName = synth.getNoteName(n.note)[0].toLowerCase();
+            const noteName = synth.getNoteName(n.pitch)[0].toLowerCase();
 
-            if (synth.isSharp(n.note) && !keySharps.includes(noteName)) {
+            if (synth.isSharp(n.pitch) && !keySharps.includes(noteName)) {
                 symbol = <><span className='Staff-Accidental'>♯</span>{symbol}</>;
             }
-            else if (!synth.isSharp(n.note) && keySharps.includes(noteName)) {
+            else if (!synth.isSharp(n.pitch) && keySharps.includes(noteName)) {
                 symbol = <><span className='Staff-Accidental'>♮</span>{symbol}</>;
             }
 
             staffParts.push({
                 type: "note",
-                title: synth.getNoteName(n.note),
+                title: synth.getNoteName(n.pitch),
                 bottom: offset * scale,
                 symbol,
                 selected: i === selectedIndex,

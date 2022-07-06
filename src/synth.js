@@ -1,6 +1,6 @@
 /**
  * @typedef MelodyNote
- * @prop {number} note
+ * @prop {number} pitch
  * @prop {number} count
  */
 
@@ -180,9 +180,9 @@ const synth = {
       let now = audioCtx.currentTime;
 
       for (const note of notes) {
-        this.noteOn(203, note.note, now);
+        this.noteOn(203, note.pitch, now);
         now += note.count * 60 / tempo;
-        this.noteOff(note.note, now);
+        this.noteOff(note.pitch, now);
       }
     },
 

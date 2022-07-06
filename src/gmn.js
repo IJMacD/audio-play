@@ -70,7 +70,7 @@ const gmn = {
 
                     const count = 4 / stickyDuration * multiplier;
 
-                    melody.push({ note: synth.REST, count });
+                    melody.push({ pitch: synth.REST, count });
 
                     continue;
                 }
@@ -104,13 +104,13 @@ const gmn = {
                 noteOffset--;
             }
 
-            const note = trueOctave * 12 + noteOffset;
+            const pitch = trueOctave * 12 + noteOffset;
 
             const multiplier = match[5] === "." ? 1.5 : 1;
 
             const count = 4 / stickyDuration * multiplier;
 
-            melody.push({ note, count });
+            melody.push({ pitch, count });
         }
 
         return { melody, timeSignature, keySignature };
