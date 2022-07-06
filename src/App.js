@@ -174,7 +174,7 @@ class App extends React.Component {
             this.previousInstrument();
         } else if (e.key === "ArrowDown") {
             this.nextInstrument();
-        } else if (this.state.keyboardEnabled) {
+        } else if (this.state.keyboardEnabled && !e.repeat) {
 
             const note = mapKeyEventToNote(e);
 
@@ -182,6 +182,15 @@ class App extends React.Component {
                 e.preventDefault();
                 this.noteOn(note);
             }
+        }
+    }
+
+    handleKeyUp (e) {
+        const note = mapKeyEventToNote(e);
+
+        if (note >= 0) {
+            e.preventDefault();
+            this.noteOff(note);
         }
     }
 
@@ -197,15 +206,6 @@ class App extends React.Component {
         const currentIndex = instrumentList.indexOf(this.state.instrument);
         const instrument = instrumentList[(currentIndex + 1) % instrumentList.length];
         this.setState({ instrument });
-    }
-
-    handleKeyUp (e) {
-        const note = mapKeyEventToNote(e);
-
-        if (note >= 0) {
-            e.preventDefault();
-            this.noteOff(note);
-        }
     }
 
     /**

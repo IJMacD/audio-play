@@ -76,20 +76,21 @@ canvas {
   background-repeat: repeat;
   background-size: 100px 70px;
   line-height: 70px;
+  vertical-align: bottom; /* For all children */
 }
 .Staff-Note {
   position: relative;
   margin: 0 5px;
+  vertical-align: inherit;
 }
 .Staff-KeySignature {
   font-size: 0.5em;
-  vertical-align: bottom;
+  vertical-align: inherit;
   position: relative;
 }
 .Staff-TimeSignature {
   font-size: 30px;
   line-height: 20px;
-  vertical-align: baseline;
   display: inline-block;
   font-family: 'Georgia Pro', Georgia, 'DejaVu Serif', Times, 'Times New Roman', FreeSerif, 'DejaVu Math TeX', 'URW Bookman L', serif;
   font-weight: bold;
@@ -97,17 +98,18 @@ canvas {
 .Staff-TimeSignature sub,
 .Staff-TimeSignature sup
 {
-  vertical-align: baseline;
+  vertical-align: inherit;
 }
 .Staff-Accidental {
   font-size: 0.5em;
-  vertical-align: bottom;
+  vertical-align: inherit;
   position: relative;
   top: 0.5em;
 }
 .Staff-Rest {
   font-size: 0.8em;
   position: relative;
-  bottom: 2px;
+  bottom: -2px;
   margin: 0 10px;
+  vertical-align: inherit;
 }
