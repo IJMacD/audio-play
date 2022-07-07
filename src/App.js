@@ -37,6 +37,9 @@ function mapKeyEventToNote (e) {
  * @prop {number} keySignature
  */
 
+/**
+ * @extends {React.Component<any, AppState>}
+ */
 class App extends React.Component {
     constructor (props) {
         super(props);
@@ -70,6 +73,8 @@ class App extends React.Component {
         this.handleGMNTextChange = this.handleGMNTextChange.bind(this);
 
         this.activeInputs = [];
+
+        this.keyDownTime = NaN;
     }
 
     /**
@@ -85,7 +90,32 @@ class App extends React.Component {
         }
 
         if (this.state.isRecording) {
-            this.setState({ melody: [ ...this.state.melody, { pitch, count: 1 } ] });
+            this.setState(({ melody }) => {
+                const len = melody.length;
+                const restNotes = melody.slice(0, -1);
+                const lastNote = melody[len-1];
+
+                const prevTime = this.keyDownTime;
+                this.keyDownTime = Date.now();
+
+                const timeSignatureDuration = this.state.timeSignature?.[1] || 4;
+
+                // If there is a previous note adjust its duration based on the
+                // time this note has started
+                if (!isNaN(prevTime) && lastNote) {
+                    const delta = (Date.now() - prevTime)/1000;
+                    const beatDuration = 60 / this.state.tempo * timeSignatureDuration;
+                    const rawFractionOfBeat = delta / beatDuration;
+                    const log2 = Math.log2(rawFractionOfBeat);
+                    const fractionOfBeat = Math.pow(2, Math.round(log2));
+                    const count = fractionOfBeat * 1;
+
+                    return { melody: [ ...restNotes, { ...lastNote, count }, { pitch, count: 1 / timeSignatureDuration } ] };
+                }
+
+                return { melody: [ { pitch, count: 1 / timeSignatureDuration } ] };
+
+            });
         }
     }
 
@@ -127,6 +157,10 @@ class App extends React.Component {
         const { isRecording } = this.state;
         const melody = isRecording || e.shiftKey ? this.state.melody : [];
         this.setState({ isRecording: !isRecording, melody });
+
+        if (isRecording) {
+            this.keyDownTime = NaN;
+        }
     }
 
     handlePlayButton () {

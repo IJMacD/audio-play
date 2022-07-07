@@ -16,11 +16,16 @@ const NOTE_INDEX = "ccddeffggaab";
 //     b/4. b c2/8 d/4. d d/8 c/4 b1/8 c2/4 d/8 b1/2. g/4. g a/8
 //     b/4. b b/8 a/4 g/8 a/4 b/8 g/4. d. g g/8 g/4 a/8
 //     b/4. b b/8 a/4 g/8 a/4 b/8 g/2.
-// Example Ba Ba Black Sheep
+// Example: Ba Ba Black Sheep
 //     \meter<"2/4"> \key<2>
 //     d d | a a | b/8 c#2 d b1 | a/2 | g/4 g |
 //     f# f# | e e | d/2 | a/4 a/8 a | g/4 g/8 g |
 //     f#/4 f#/8 f# | e/4 e | a/4 a/8 a | g a b g | f#/4 e/8 e | d/2 |
+// Example: If I had words (Tempo = 216)
+//     \meter<"4/4"> \key<1>
+//     _/2 b a b g a b d2
+//     e/4. d/8 d/2 _/1 d/2 e c b1
+//     c2 a1 b/4 c2 d/2 a1/1
 
 const gmn = {
     /**
