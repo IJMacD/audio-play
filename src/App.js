@@ -2,6 +2,7 @@ import React from 'react';
 import './App.css';
 import gmn from './gmn';
 import Keys from './Keys';
+import { Metronome } from './Metronome';
 import Staff from './Staff';
 import synth from './synth';
 
@@ -369,6 +370,7 @@ class App extends React.Component {
                         Tempo
                         <input type="number" value={tempo} onChange={e => { e.stopPropagation(); this.setState({ tempo: +e.target.value }); }} />
                     </label>
+                    <Metronome tempo={this.state.tempo} />
                     <Staff notes={melody} timeSignature={this.state.timeSignature} keySignature={this.state.keySignature} onNoteClick={this.handleMelodyClick} selectedIndex={currentMelodyIndex} />
                 </div>
                 <div>

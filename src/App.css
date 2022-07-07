@@ -114,3 +114,29 @@ canvas {
   margin: 0 10px;
   vertical-align: inherit;
 }
+.Metronome {
+  width: 100px;
+  height: 50px;
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+.Metronome-Hand {
+  width: 1px;
+  height: 100%;
+  background-color: #111;
+  position: absolute;
+  left: 0%;
+  animation-name: metronome-tick;
+  animation-timing-function: linear;
+  animation-direction: alternate;
+  animation-iteration-count: infinite;
+}
+@keyframes metronome-tick {
+  0% {
+    left: 0%;
+  }
+  100% {
+    left: 100%;
+  }
+}
