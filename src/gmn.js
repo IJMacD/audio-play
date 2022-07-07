@@ -68,7 +68,7 @@ const gmn = {
 
                     const multiplier = restMatch[2] === "." ? 1.5 : 1;
 
-                    const count = 4 / stickyDuration * multiplier;
+                    const count = 1 / stickyDuration * multiplier;
 
                     melody.push({ pitch: synth.REST, count });
 
@@ -108,7 +108,7 @@ const gmn = {
 
             const multiplier = match[5] === "." ? 1.5 : 1;
 
-            const count = 4 / stickyDuration * multiplier;
+            const count = 1 / stickyDuration * multiplier;
 
             melody.push({ pitch, count });
         }

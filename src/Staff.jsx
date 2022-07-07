@@ -2,19 +2,25 @@ import React from 'react';
 import synth from "./synth";
 
 const NOTES = {
-    0.25: "𝅘𝅥𝅯",
-    0.5: "𝅘𝅥𝅮",
-    1: "𝅘𝅥",
-    2: "𝅗𝅥",
-    4: "𝅝",
+    1: "𝅝",
+    [1/2]: "𝅗𝅥",
+    [1/4]: "𝅘𝅥",
+    [1/8]: "𝅘𝅥𝅮",
+    [1/16]: "𝅘𝅥𝅯",
+    [1/32]: "𝅘𝅥𝅰",
+    [1/64]: "𝅘𝅥𝅱",
+    [1/128]: "𝅘𝅥𝅲",
 };
 
 const REST_SYMBOL = {
-    0.25: "𝄿",
-    0.5: "𝄾",
-    1: "𝄽",
-    2: "𝄼",
-    4: "𝄻",
+    1: "𝄻",
+    [1/2]: "𝄼",
+    [1/4]: "𝄽",
+    [1/8]: "𝄾",
+    [1/16]: "𝄿",
+    [1/32]: "𝅀",
+    [1/64]: "𝅁",
+    [1/128]: "𝅂",
 }
 
 const CIRCLE_OF_FIFTHS_SHARP = "fcgdaeb";
@@ -76,6 +82,7 @@ export default function Staff ({ notes, timeSignature, keySignature, onNoteClick
 
             const offset = getNoteStaffOffset(n.pitch);
 
+            /** @type {import('react').ReactElement|string} */
             let symbol = NOTES[n.count];
 
             if (!symbol) {
@@ -110,7 +117,7 @@ export default function Staff ({ notes, timeSignature, keySignature, onNoteClick
 
         count += n.count;
 
-        if (timeSignature && count / 4 * timeSignature[1] % timeSignature[0] === 0) {
+        if (timeSignature && count * timeSignature[1] % timeSignature[0] === 0) {
             staffParts.push({ type: "bar", symbol: i === notes.length ? "𝄂 " : "𝄀 " });
         }
     }

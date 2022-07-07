@@ -178,10 +178,11 @@ const synth = {
       }
 
       let now = audioCtx.currentTime;
+      const timeSignature = 4;
 
       for (const note of notes) {
         this.noteOn(203, note.pitch, now);
-        now += note.count * 60 / tempo;
+        now += note.count * timeSignature * 60 / tempo;
         this.noteOff(note.pitch, now);
       }
     },

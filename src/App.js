@@ -105,15 +105,16 @@ class App extends React.Component {
      * @param {number} tempo
      */
     playTune (melody, tempo) {
-        let now = 0.1; // tenth of a second delay to give JS a chance
+        let now = 0.5; // half second delay to give JS a chance
         let index = 0;
+        const countPerBeat = this.state.timeSignature?.[1] ?? 4;
         for (const n of melody) {
             const i = index++;
             setTimeout(() => {
                 this.noteOn(n.pitch);
                 this.setState({ currentMelodyIndex: i });
             }, now * 1000);
-            now += n.count * 60 / tempo;
+            now += n.count * countPerBeat * 60 / tempo;
             setTimeout(() => this.noteOff(n.pitch), now * 1000);
         }
         setTimeout(() => this.setState({ currentMelodyIndex: -1 }), now * 1000);
@@ -231,7 +232,7 @@ class App extends React.Component {
                     if (i === index) {
                         let { pitch, count } = n;
                         count /= 2;
-                        if (count < 0.25) count = 4;
+                        if (count < 1/16) count = 1;
                         return { pitch, count };
                     }
                     return n;
@@ -295,9 +296,8 @@ class App extends React.Component {
     }
 
     componentDidUpdate () {
-        const { instrument, showKeyMap, melody, tempo, gmnText, timeSignature } = this.state;
-
-        setSavedState(SAVED_STATE_KEY, { instrument, showKeyMap, melody, tempo, gmnText, timeSignature });
+        const { isRecording, midiDevices , ...toSave } = this.state;
+        setSavedState(SAVED_STATE_KEY, toSave);
     }
 
     componentWillUnmount () {

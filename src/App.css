@@ -82,6 +82,7 @@ canvas {
   position: relative;
   margin: 0 5px;
   vertical-align: inherit;
+  cursor: pointer;
 }
 .Staff-KeySignature {
   font-size: 0.5em;
